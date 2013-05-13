@@ -229,8 +229,7 @@ void t_csharp5_generator::end_csharp_namespace(ofstream& out) {
 string t_csharp5_generator::csharp_type_usings() {
 	return string() + "using System;\n" + "using System.Collections;\n"
 			+ "using System.Collections.Generic;\n" + "using System.Text;\n"
-			+ "using System.IO;\n"
-			+ "using System.Threading.Tasks;\n"
+			+ "using System.IO;\n" + "using System.Threading.Tasks;\n"
 			+ "using Thrift;\n" + "using Thrift.Collections;\n"
 			+ (wcf_ ? "//using System.ServiceModel;\n" : "")
 			+ "using System.Runtime.Serialization;\n";
@@ -523,7 +522,8 @@ void t_csharp5_generator::generate_csharp_struct_definition(ofstream &out,
 	for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
 		// if the field is requied, then we use auto-properties
 		if (!field_is_required((*m_iter)) && field_has_default((*m_iter))) {
-			indent(out) << "private " << declare_field(*m_iter, false, "_")	<< endl;
+			indent(out) << "private " << declare_field(*m_iter, false, "_")
+					<< endl;
 		}
 	}
 	out << endl;
@@ -854,14 +854,6 @@ void t_csharp5_generator::generate_csharp_struct_result_writer(ofstream& out,
 			out << "(this." << prop_name((*f_iter)) << " != null) {" << endl;
 			indent_up();
 
-			bool null_allowed = !nullable_
-					&& type_can_be_null((*f_iter)->get_type());
-			if (null_allowed) {
-				indent(out) << "if (" << prop_name(*f_iter) << " != null) {"
-						<< endl;
-				indent_up();
-			}
-
 			indent(out) << "field.Name = \"" << prop_name(*f_iter) << "\";"
 					<< endl;
 			indent(out) << "field.Type = "
@@ -872,11 +864,6 @@ void t_csharp5_generator::generate_csharp_struct_result_writer(ofstream& out,
 			generate_serialize_field(out, *f_iter);
 
 			indent(out) << "oprot.WriteFieldEnd();" << endl;
-
-			if (null_allowed) {
-				indent_down();
-				indent(out) << "}" << endl;
-			}
 
 			indent_down();
 			indent(out) << "}";
@@ -1063,8 +1050,7 @@ void t_csharp5_generator::generate_csharp_struct_equals(ofstream& out,
 			out << endl;
 			indent(out) << "&& ";
 		}
-		if (!field_is_required((*f_iter))
-				&& !(nullable_ && !field_has_default((*f_iter)))) {
+		if (!field_is_required((*f_iter)) && field_has_default((*f_iter))) {
 			out << "((__isset." << (*f_iter)->get_name() << " == other.__isset."
 					<< (*f_iter)->get_name() << ") && ((!__isset."
 					<< (*f_iter)->get_name() << ") || (";
@@ -1077,8 +1063,7 @@ void t_csharp5_generator::generate_csharp_struct_equals(ofstream& out,
 			out << prop_name((*f_iter)) << ".Equals(other."
 					<< prop_name((*f_iter)) << ")";
 		}
-		if (!field_is_required((*f_iter))
-				&& !(nullable_ && !field_has_default((*f_iter)))) {
+		if (!field_is_required((*f_iter)) && field_has_default((*f_iter))) {
 			out << ")))";
 		}
 	}
@@ -1110,10 +1095,8 @@ void t_csharp5_generator::generate_csharp_struct_hashcode(ofstream& out,
 		indent(out) << "hashcode = (hashcode * 397) ^ ";
 		if (field_is_required((*f_iter))) {
 			out << "(";
-		} else if (nullable_) {
-			out << "(" << prop_name((*f_iter)) << " == null ? 0 : ";
 		} else {
-			out << "(!__isset." << (*f_iter)->get_name() << " ? 0 : ";
+			out << "(" << prop_name((*f_iter)) << " == null ? 0 : ";
 		}
 		if (ttype->is_container()) {
 			out << "(TCollections.GetHashCode(" << prop_name((*f_iter)) << "))";
@@ -1196,20 +1179,11 @@ void t_csharp5_generator::generate_service_interface(t_service* tservice) {
 		}
 
 		indent(f_service_) << function_signature(*f_iter) << ";" << endl;
-		if (!async_) {
-			indent(f_service_) << "#if SILVERLIGHT" << endl;
-		}
 		indent(f_service_) << function_signature_async_begin(*f_iter, "Begin_")
 				<< ";" << endl;
 		indent(f_service_) << function_signature_async_end(*f_iter, "End_")
 				<< ";" << endl;
-		if (async_ || async_ctp_) {
-			indent(f_service_) << function_signature_async(*f_iter) << ";"
-					<< endl;
-		}
-		if (!async_) {
-			indent(f_service_) << "#endif" << endl;
-		}
+		indent(f_service_) << function_signature_async(*f_iter) << ";" << endl;
 	}
 	indent_down();
 	f_service_ << indent() << "}" << endl << endl;
@@ -1284,9 +1258,6 @@ void t_csharp5_generator::generate_service_client(t_service* tservice) {
 
 		indent(f_service_) << endl;
 
-		if (!async_) {
-			indent(f_service_) << "#if SILVERLIGHT" << endl;
-		}
 		// Begin_
 		indent(f_service_) << "public "
 				<< function_signature_async_begin(*f_iter, "Begin_") << endl;
@@ -1323,1178 +1294,1084 @@ void t_csharp5_generator::generate_service_client(t_service* tservice) {
 
 		// async
 		bool first;
-		if (async_ || async_ctp_) {
-			indent(f_service_) << "public async "
-					<< function_signature_async(*f_iter, "") << endl;
-			scope_up(f_service_);
-
-			if (!(*f_iter)->get_returntype()->is_void()) {
-				indent(f_service_) << type_name((*f_iter)->get_returntype())
-						<< " retval;" << endl;
-				indent(f_service_) << "retval = ";
-			} else {
-				indent(f_service_);
-			}
-			if (async_) {
-				f_service_ << "await Task.Run(() =>" << endl;
-			} else {
-				f_service_ << "await TaskEx.Run(() =>" << endl;
-			}
-			scope_up(f_service_);
-			indent(f_service_);
-			if (!(*f_iter)->get_returntype()->is_void()) {
-				f_service_ << "return ";
-			}
-			f_service_ << funname << "(";
-			first = true;
-			for (fld_iter = fields.begin(); fld_iter != fields.end();
-					++fld_iter) {
-				if (first) {
-					first = false;
-				} else {
-					f_service_ << ", ";
-				}
-				f_service_ << (*fld_iter)->get_name();
-			}
-			f_service_ << ");" << endl;
-			indent_down();
-			indent(f_service_) << "});" << endl;
-			if (!(*f_iter)->get_returntype()->is_void()) {
-				indent(f_service_) << "return retval;" << endl;
-			}
-			scope_down(f_service_);
-			f_service_ << endl;
-		}
-
-		if (!async_) {
-			indent(f_service_) << "#endif" << endl << endl;
-		}
-
-		// "Normal" Synchronous invoke
-		generate_csharp_doc(f_service_, *f_iter);
-		indent(f_service_) << "public " << function_signature(*f_iter) << endl;
+		indent(f_service_) << "public async "
+				<< function_signature_async(*f_iter, "") << endl;
 		scope_up(f_service_);
 
-		if (!async_) {
-			indent(f_service_) << "#if !SILVERLIGHT" << endl;
-			indent(f_service_) << "send_" << funname << "(";
-
-			first = true;
-			for (fld_iter = fields.begin(); fld_iter != fields.end();
-					++fld_iter) {
-				if (first) {
-					first = false;
-				} else {
-					f_service_ << ", ";
-				}
-				f_service_ << (*fld_iter)->get_name();
-			}
-			f_service_ << ");" << endl;
-
-			if (!(*f_iter)->is_oneway()) {
-				f_service_ << indent();
-				if (!(*f_iter)->get_returntype()->is_void()) {
-					f_service_ << "return ";
-				}
-				f_service_ << "recv_" << funname << "();" << endl;
-			}
-			f_service_ << endl;
-
-			indent(f_service_) << "#else" << endl;
+		if (!(*f_iter)->get_returntype()->is_void()) {
+			indent(f_service_) << type_name((*f_iter)->get_returntype())
+					<< " retval;" << endl;
+			indent(f_service_) << "retval = ";
+		} else {
+			indent(f_service_);
 		}
 
-		// Silverlight synchronous invoke
-		indent(f_service_) << "var asyncResult = Begin_" << funname
-				<< "(null, null";
+		f_service_ << "await Task.Run(() =>" << endl;
+
+		scope_up(f_service_);
+		indent(f_service_);
+		if (!(*f_iter)->get_returntype()->is_void()) {
+			f_service_ << "return ";
+		}
+		f_service_ << funname << "(";
+		first = true;
 		for (fld_iter = fields.begin(); fld_iter != fields.end(); ++fld_iter) {
-			f_service_ << ", " << (*fld_iter)->get_name();
+			if (first) {
+				first = false;
+			} else {
+				f_service_ << ", ";
+			}
+			f_service_ << (*fld_iter)->get_name();
 		}
 		f_service_ << ");" << endl;
-
-		if (!(*f_iter)->is_oneway()) {
-			f_service_ << indent();
-			if (!(*f_iter)->get_returntype()->is_void()) {
-				f_service_ << "return ";
-			}
-			f_service_ << "End_" << funname << "(asyncResult);" << endl;
-		}
-		f_service_ << endl;
-
-		if (!async_) {
-			indent(f_service_) << "#endif" << endl;
+		indent_down();
+		indent(f_service_) << "});" << endl;
+		if (!(*f_iter)->get_returntype()->is_void()) {
+			indent(f_service_) << "return retval;" << endl;
 		}
 		scope_down(f_service_);
-
-		// Send
-		t_function send_function(g_type_void,
-				string("send_") + (*f_iter)->get_name(),
-				(*f_iter)->get_arglist());
-
-		string argsname = (*f_iter)->get_name() + "_args";
-
-		if (!async_) {
-			indent(f_service_) << "#if SILVERLIGHT" << endl;
-		}
-		indent(f_service_) << "public "
-				<< function_signature_async_begin(&send_function) << endl;
-		if (!async_) {
-			indent(f_service_) << "#else" << endl;
-			indent(f_service_) << "public "
-					<< function_signature(&send_function) << endl;
-			indent(f_service_) << "#endif" << endl;
-		}
-		scope_up(f_service_);
-
-		f_service_ << indent() << "oprot_.WriteMessageBegin(new TMessage(\""
-				<< funname << "\", TMessageType.Call, seqid_));" << endl
-				<< indent() << argsname << " args = new " << argsname << "();"
-				<< endl;
-
-		for (fld_iter = fields.begin(); fld_iter != fields.end(); ++fld_iter) {
-			f_service_ << indent() << "args." << prop_name(*fld_iter) << " = "
-					<< (*fld_iter)->get_name() << ";" << endl;
-		}
-
-		f_service_ << indent() << "args.Write(oprot_);" << endl << indent()
-				<< "oprot_.WriteMessageEnd();" << endl;
-		;
-
-		if (!async_) {
-			indent(f_service_) << "#if SILVERLIGHT" << endl;
-		}
-		indent(f_service_)
-				<< "return oprot_.Transport.BeginFlush(callback, state);"
-				<< endl;
-		if (!async_) {
-			indent(f_service_) << "#else" << endl;
-			indent(f_service_) << "oprot_.Transport.Flush();" << endl;
-			indent(f_service_) << "#endif" << endl;
-		}
-
-		scope_down(f_service_);
 		f_service_ << endl;
-
-		if (!(*f_iter)->is_oneway()) {
-			string resultname = (*f_iter)->get_name() + "_result";
-
-			t_struct noargs(program_);
-			t_function recv_function((*f_iter)->get_returntype(),
-					string("recv_") + (*f_iter)->get_name(), &noargs,
-					(*f_iter)->get_xceptions());
-			indent(f_service_) << "public "
-					<< function_signature(&recv_function) << endl;
-			scope_up(f_service_);
-
-			f_service_ << indent()
-					<< "TMessage msg = iprot_.ReadMessageBegin();" << endl
-					<< indent() << "if (msg.Type == TMessageType.Exception) {"
-					<< endl;
-			indent_up();
-			f_service_ << indent()
-					<< "TApplicationException x = TApplicationException.Read(iprot_);"
-					<< endl << indent() << "iprot_.ReadMessageEnd();" << endl
-					<< indent() << "throw x;" << endl;
-			indent_down();
-			f_service_ << indent() << "}" << endl << indent() << resultname
-					<< " result = new " << resultname << "();" << endl
-					<< indent() << "result.Read(iprot_);" << endl << indent()
-					<< "iprot_.ReadMessageEnd();" << endl;
-
-			if (!(*f_iter)->get_returntype()->is_void()) {
-				if (nullable_) {
-					if (type_can_be_null((*f_iter)->get_returntype())) {
-						f_service_ << indent()
-								<< "if (result.Success != null) {" << endl
-								<< indent() << "  return result.Success;"
-								<< endl << indent() << "}" << endl;
-					} else {
-						f_service_ << indent()
-								<< "if (result.Success.HasValue) {" << endl
-								<< indent() << "  return result.Success.Value;"
-								<< endl << indent() << "}" << endl;
-					}
-				} else {
-					f_service_ << indent() << "if (result.__isset.success) {"
-							<< endl << indent() << "  return result.Success;"
-							<< endl << indent() << "}" << endl;
-				}
-			}
-
-			t_struct *xs = (*f_iter)->get_xceptions();
-
-			const std::vector<t_field*>& xceptions = xs->get_members();
-			vector<t_field*>::const_iterator x_iter;
-			for (x_iter = xceptions.begin(); x_iter != xceptions.end();
-					++x_iter) {
-				if (nullable_) {
-					f_service_ << indent() << "if (result."
-							<< prop_name(*x_iter) << " != null) {" << endl
-							<< indent() << "  throw result."
-							<< prop_name(*x_iter) << ";" << endl << indent()
-							<< "}" << endl;
-				} else {
-					f_service_ << indent() << "if (result.__isset."
-							<< (*x_iter)->get_name() << ") {" << endl
-							<< indent() << "  throw result."
-							<< prop_name(*x_iter) << ";" << endl << indent()
-							<< "}" << endl;
-				}
-			}
-
-			if ((*f_iter)->get_returntype()->is_void()) {
-				indent(f_service_) << "return;" << endl;
-			} else {
-				f_service_ << indent()
-						<< "throw new TApplicationException(TApplicationException.ExceptionType.MissingResult, \""
-						<< (*f_iter)->get_name()
-						<< " failed: unknown result\");" << endl;
-			}
-
-			scope_down(f_service_);
-			f_service_ << endl;
-		}
 	}
-
-	indent_down();
-	indent(f_service_) << "}" << endl;
-}
-
-void t_csharp5_generator::generate_service_server(t_service* tservice) {
-	vector<t_function*> functions = tservice->get_functions();
-	vector<t_function*>::iterator f_iter;
-
-	string extends = "";
-	string extends_processor = "";
-	if (tservice->get_extends() != NULL) {
-		extends = type_name(tservice->get_extends());
-		extends_processor = extends + ".Processor, ";
-	}
-
-	indent(f_service_) << "public class Processor : " << extends_processor
-			<< "TProcessor {" << endl;
-	indent_up();
-
-	indent(f_service_) << "public Processor(Iface iface)";
-	if (!extends.empty()) {
-		f_service_ << " : base(iface)";
-	}
-	f_service_ << endl;
-	scope_up(f_service_);
-	f_service_ << indent() << "iface_ = iface;" << endl;
-
-	for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
-		f_service_ << indent() << "processMap_[\"" << (*f_iter)->get_name()
-				<< "\"] = " << (*f_iter)->get_name() << "_Process;" << endl;
-	}
-
-	scope_down(f_service_);
-	f_service_ << endl;
-
-	if (extends.empty()) {
-		f_service_ << indent()
-				<< "protected delegate void ProcessFunction(int seqid, TProtocol iprot, TProtocol oprot);"
-				<< endl;
-	}
-
-	f_service_ << indent() << "private Iface iface_;" << endl;
-
-	if (extends.empty()) {
-		f_service_ << indent()
-				<< "protected Dictionary<string, ProcessFunction> processMap_ = new Dictionary<string, ProcessFunction>();"
-				<< endl;
-	}
-
-	f_service_ << endl;
-
-	if (extends.empty()) {
-		indent(f_service_)
-				<< "public bool Process(TProtocol iprot, TProtocol oprot)"
-				<< endl;
-	} else {
-		indent(f_service_)
-				<< "public new bool Process(TProtocol iprot, TProtocol oprot)"
-				<< endl;
-	}
+	// "Normal" Synchronous invoke
+	generate_csharp_doc(f_service_, *f_iter);
+	indent(f_service_) << "public " << function_signature(*f_iter) << endl;
 	scope_up(f_service_);
 
-	f_service_ << indent() << "try" << endl;
-	scope_up(f_service_);
-
-	f_service_ << indent() << "TMessage msg = iprot.ReadMessageBegin();"
-			<< endl;
-
-	f_service_ << indent() << "ProcessFunction fn;" << endl << indent()
-			<< "processMap_.TryGetValue(msg.Name, out fn);" << endl << indent()
-			<< "if (fn == null) {" << endl << indent()
-			<< "  TProtocolUtil.Skip(iprot, TType.Struct);" << endl << indent()
-			<< "  iprot.ReadMessageEnd();" << endl << indent()
-			<< "  TApplicationException x = new TApplicationException (TApplicationException.ExceptionType.UnknownMethod, \"Invalid method name: '\" + msg.Name + \"'\");"
-			<< endl << indent()
-			<< "  oprot.WriteMessageBegin(new TMessage(msg.Name, TMessageType.Exception, msg.SeqID));"
-			<< endl << indent() << "  x.Write(oprot);" << endl << indent()
-			<< "  oprot.WriteMessageEnd();" << endl << indent()
-			<< "  oprot.Transport.Flush();" << endl << indent()
-			<< "  return true;" << endl << indent() << "}" << endl << indent()
-			<< "fn(msg.SeqID, iprot, oprot);" << endl;
-
-	scope_down(f_service_);
-
-	f_service_ << indent() << "catch (IOException)" << endl;
-	scope_up(f_service_);
-	f_service_ << indent() << "return false;" << endl;
-	scope_down(f_service_);
-
-	f_service_ << indent() << "return true;" << endl;
-
-	scope_down(f_service_);
-	f_service_ << endl;
-
-	for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
-		generate_process_function(tservice, *f_iter);
-	}
-
-	indent_down();
-	indent(f_service_) << "}" << endl << endl;
-}
-
-void t_csharp5_generator::generate_function_helpers(t_function* tfunction) {
-	if (tfunction->is_oneway()) {
-		return;
-	}
-
-	t_struct result(program_, tfunction->get_name() + "_result");
-	t_field success(tfunction->get_returntype(), "success", 0);
-	if (!tfunction->get_returntype()->is_void()) {
-		result.append(&success);
-	}
-
-	t_struct *xs = tfunction->get_xceptions();
-	const vector<t_field*>& fields = xs->get_members();
-	vector<t_field*>::const_iterator f_iter;
-	for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-		result.append(*f_iter);
-	}
-
-	generate_csharp_struct_definition(f_service_, &result, false, true, true);
-}
-
-void t_csharp5_generator::generate_process_function(t_service* tservice,
-		t_function* tfunction) {
-	(void) tservice;
-	indent(f_service_) << "public void " << tfunction->get_name()
-			<< "_Process(int seqid, TProtocol iprot, TProtocol oprot)" << endl;
-	scope_up(f_service_);
-
-	string argsname = tfunction->get_name() + "_args";
-	string resultname = tfunction->get_name() + "_result";
-
-	f_service_ << indent() << argsname << " args = new " << argsname << "();"
-			<< endl << indent() << "args.Read(iprot);" << endl << indent()
-			<< "iprot.ReadMessageEnd();" << endl;
-
-	t_struct* xs = tfunction->get_xceptions();
-	const std::vector<t_field*>& xceptions = xs->get_members();
-	vector<t_field*>::const_iterator x_iter;
-
-	if (!tfunction->is_oneway()) {
-		f_service_ << indent() << resultname << " result = new " << resultname
-				<< "();" << endl;
-	}
-
-	if (xceptions.size() > 0) {
-		f_service_ << indent() << "try {" << endl;
-		indent_up();
-	}
-
-	t_struct* arg_struct = tfunction->get_arglist();
-	const std::vector<t_field*>& fields = arg_struct->get_members();
-	vector<t_field*>::const_iterator f_iter;
-
-	f_service_ << indent();
-	if (!tfunction->is_oneway() && !tfunction->get_returntype()->is_void()) {
-		f_service_ << "result.Success = ";
-	}
-	f_service_ << "iface_." << tfunction->get_name() << "(";
-	bool first = true;
-	for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-		if (first) {
-			first = false;
-		} else {
-			f_service_ << ", ";
-		}
-		f_service_ << "args." << prop_name(*f_iter);
-		if (nullable_ && !type_can_be_null((*f_iter)->get_type())) {
-			f_service_ << ".Value";
-		}
+	// Silverlight synchronous invoke
+	indent(f_service_) << "var asyncResult = Begin_" << funname
+			<< "(null, null";
+	for (fld_iter = fields.begin(); fld_iter != fields.end(); ++fld_iter) {
+		f_service_ << ", " << (*fld_iter)->get_name();
 	}
 	f_service_ << ");" << endl;
 
-	if (!tfunction->is_oneway() && xceptions.size() > 0) {
-		indent_down();
-		f_service_ << indent() << "}";
-		for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
-			f_service_ << " catch ("
-					<< type_name((*x_iter)->get_type(), false, false) << " "
-					<< (*x_iter)->get_name() << ") {" << endl;
-			if (!tfunction->is_oneway()) {
-				indent_up();
-				f_service_ << indent() << "result." << prop_name(*x_iter)
-						<< " = " << (*x_iter)->get_name() << ";" << endl;
-				indent_down();
-				f_service_ << indent() << "}";
-			} else {
-				f_service_ << "}";
-			}
+	if (!(*f_iter)->is_oneway()) {
+		f_service_ << indent();
+		if (!(*f_iter)->get_returntype()->is_void()) {
+			f_service_ << "return ";
 		}
-		f_service_ << endl;
+		f_service_ << "End_" << funname << "(asyncResult);" << endl;
 	}
-
-	if (tfunction->is_oneway()) {
-		f_service_ << indent() << "return;" << endl;
-		scope_down(f_service_);
-
-		return;
-	}
-
-	f_service_ << indent() << "oprot.WriteMessageBegin(new TMessage(\""
-			<< tfunction->get_name() << "\", TMessageType.Reply, seqid)); "
-			<< endl << indent() << "result.Write(oprot);" << endl << indent()
-			<< "oprot.WriteMessageEnd();" << endl << indent()
-			<< "oprot.Transport.Flush();" << endl;
+	f_service_ << endl;
 
 	scope_down(f_service_);
 
+	// Send
+	t_function send_function(g_type_void,
+			string("send_") + (*f_iter)->get_name(), (*f_iter)->get_arglist());
+
+	string argsname = (*f_iter)->get_name() + "_args";
+
+	indent(f_service_) << "public "
+			<< function_signature_async_begin(&send_function) << endl;
+	scope_up(f_service_);
+
+	f_service_ << indent() << "oprot_.WriteMessageBegin(new TMessage(\""
+			<< funname << "\", TMessageType.Call, seqid_));" << endl << indent()
+			<< argsname << " args = new " << argsname << "();" << endl;
+
+	for (fld_iter = fields.begin(); fld_iter != fields.end(); ++fld_iter) {
+		f_service_ << indent() << "args." << prop_name(*fld_iter) << " = "
+				<< (*fld_iter)->get_name() << ";" << endl;
+	}
+
+	f_service_ << indent() << "args.Write(oprot_);" << endl << indent()
+			<< "oprot_.WriteMessageEnd();" << endl;
+	;
+
+	indent(f_service_) << "return oprot_.Transport.BeginFlush(callback, state);"
+			<< endl;
+
+	scope_down(f_service_);
+	f_service_ << endl;
+
+	if (!(*f_iter)->is_oneway()) {
+		string resultname = (*f_iter)->get_name() + "_result";
+
+		t_struct noargs(program_);
+		t_function recv_function((*f_iter)->get_returntype(),
+				string("recv_") + (*f_iter)->get_name(), &noargs,
+				(*f_iter)->get_xceptions());
+		indent(f_service_) << "public " << function_signature(&recv_function)
+				<< endl;
+		scope_up(f_service_);
+
+		f_service_ << indent() << "TMessage msg = iprot_.ReadMessageBegin();"
+				<< endl << indent()
+				<< "if (msg.Type == TMessageType.Exception) {" << endl;
+		indent_up();
+		f_service_ << indent()
+				<< "TApplicationException x = TApplicationException.Read(iprot_);"
+				<< endl << indent() << "iprot_.ReadMessageEnd();" << endl
+				<< indent() << "throw x;" << endl;
+		indent_down();
+		f_service_ << indent() << "}" << endl << indent() << resultname
+				<< " result = new " << resultname << "();" << endl << indent()
+				<< "result.Read(iprot_);" << endl << indent()
+				<< "iprot_.ReadMessageEnd();" << endl;
+
+		if (!(*f_iter)->get_returntype()->is_void()) {
+			if (type_can_be_null((*f_iter)->get_returntype())) {
+				f_service_ << indent() << "if (result.Success != null) {"
+						<< endl << indent() << "  return result.Success;"
+						<< endl << indent() << "}" << endl;
+			} else {
+				f_service_ << indent() << "if (result.Success.HasValue) {"
+						<< endl << indent() << "  return result.Success.Value;"
+						<< endl << indent() << "}" << endl;
+			}
+		}
+
+		t_struct *xs = (*f_iter)->get_xceptions();
+
+		const std::vector<t_field*>& xceptions = xs->get_members();
+		vector<t_field*>::const_iterator x_iter;
+		for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
+			f_service_ << indent() << "if (result." << prop_name(*x_iter)
+					<< " != null) {" << endl << indent() << "  throw result."
+					<< prop_name(*x_iter) << ";" << endl << indent() << "}"
+					<< endl;
+		}
+
+		if ((*f_iter)->get_returntype()->is_void()) {
+			indent(f_service_) << "return;" << endl;
+		} else {
+			f_service_ << indent()
+					<< "throw new TApplicationException(TApplicationException.ExceptionType.MissingResult, \""
+					<< (*f_iter)->get_name() << " failed: unknown result\");"
+					<< endl;
+		}
+
+		scope_down(f_service_);
+		f_service_ << endl;
+	}
+}
+
+indent_down();
+indent(f_service_) << "}" << endl;
+}
+
+void t_csharp5_generator::generate_service_server(t_service* tservice) {
+vector<t_function*> functions = tservice->get_functions();
+vector<t_function*>::iterator f_iter;
+
+string extends = "";
+string extends_processor = "";
+if (tservice->get_extends() != NULL) {
+	extends = type_name(tservice->get_extends());
+	extends_processor = extends + ".Processor, ";
+}
+
+indent(f_service_) << "public class Processor : " << extends_processor
+		<< "TProcessor {" << endl;
+indent_up();
+
+indent(f_service_) << "public Processor(Iface iface)";
+if (!extends.empty()) {
+	f_service_ << " : base(iface)";
+}
+f_service_ << endl;
+scope_up(f_service_);
+f_service_ << indent() << "iface_ = iface;" << endl;
+
+for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
+	f_service_ << indent() << "processMap_[\"" << (*f_iter)->get_name()
+			<< "\"] = " << (*f_iter)->get_name() << "_Process;" << endl;
+}
+
+scope_down(f_service_);
+f_service_ << endl;
+
+if (extends.empty()) {
+	f_service_ << indent()
+			<< "protected delegate void ProcessFunction(int seqid, TProtocol iprot, TProtocol oprot);"
+			<< endl;
+}
+
+f_service_ << indent() << "private Iface iface_;" << endl;
+
+if (extends.empty()) {
+	f_service_ << indent()
+			<< "protected Dictionary<string, ProcessFunction> processMap_ = new Dictionary<string, ProcessFunction>();"
+			<< endl;
+}
+
+f_service_ << endl;
+
+if (extends.empty()) {
+	indent(f_service_)
+			<< "public bool Process(TProtocol iprot, TProtocol oprot)" << endl;
+} else {
+	indent(f_service_)
+			<< "public new bool Process(TProtocol iprot, TProtocol oprot)"
+			<< endl;
+}
+scope_up(f_service_);
+
+f_service_ << indent() << "try" << endl;
+scope_up(f_service_);
+
+f_service_ << indent() << "TMessage msg = iprot.ReadMessageBegin();" << endl;
+
+f_service_ << indent() << "ProcessFunction fn;" << endl << indent()
+		<< "processMap_.TryGetValue(msg.Name, out fn);" << endl << indent()
+		<< "if (fn == null) {" << endl << indent()
+		<< "  TProtocolUtil.Skip(iprot, TType.Struct);" << endl << indent()
+		<< "  iprot.ReadMessageEnd();" << endl << indent()
+		<< "  TApplicationException x = new TApplicationException (TApplicationException.ExceptionType.UnknownMethod, \"Invalid method name: '\" + msg.Name + \"'\");"
+		<< endl << indent()
+		<< "  oprot.WriteMessageBegin(new TMessage(msg.Name, TMessageType.Exception, msg.SeqID));"
+		<< endl << indent() << "  x.Write(oprot);" << endl << indent()
+		<< "  oprot.WriteMessageEnd();" << endl << indent()
+		<< "  oprot.Transport.Flush();" << endl << indent() << "  return true;"
+		<< endl << indent() << "}" << endl << indent()
+		<< "fn(msg.SeqID, iprot, oprot);" << endl;
+
+scope_down(f_service_);
+
+f_service_ << indent() << "catch (IOException)" << endl;
+scope_up(f_service_);
+f_service_ << indent() << "return false;" << endl;
+scope_down(f_service_);
+
+f_service_ << indent() << "return true;" << endl;
+
+scope_down(f_service_);
+f_service_ << endl;
+
+for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
+	generate_process_function(tservice, *f_iter);
+}
+
+indent_down();
+indent(f_service_) << "}" << endl << endl;
+}
+
+void t_csharp5_generator::generate_function_helpers(t_function* tfunction) {
+if (tfunction->is_oneway()) {
+	return;
+}
+
+t_struct result(program_, tfunction->get_name() + "_result");
+t_field success(tfunction->get_returntype(), "success", 0);
+if (!tfunction->get_returntype()->is_void()) {
+	result.append(&success);
+}
+
+t_struct *xs = tfunction->get_xceptions();
+const vector<t_field*>& fields = xs->get_members();
+vector<t_field*>::const_iterator f_iter;
+for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+	result.append(*f_iter);
+}
+
+generate_csharp_struct_definition(f_service_, &result, false, true, true);
+}
+
+void t_csharp5_generator::generate_process_function(t_service* tservice,
+	t_function* tfunction) {
+(void) tservice;
+indent(f_service_) << "public void " << tfunction->get_name()
+		<< "_Process(int seqid, TProtocol iprot, TProtocol oprot)" << endl;
+scope_up(f_service_);
+
+string argsname = tfunction->get_name() + "_args";
+string resultname = tfunction->get_name() + "_result";
+
+f_service_ << indent() << argsname << " args = new " << argsname << "();"
+		<< endl << indent() << "args.Read(iprot);" << endl << indent()
+		<< "iprot.ReadMessageEnd();" << endl;
+
+t_struct* xs = tfunction->get_xceptions();
+const std::vector<t_field*>& xceptions = xs->get_members();
+vector<t_field*>::const_iterator x_iter;
+
+if (!tfunction->is_oneway()) {
+	f_service_ << indent() << resultname << " result = new " << resultname
+			<< "();" << endl;
+}
+
+if (xceptions.size() > 0) {
+	f_service_ << indent() << "try {" << endl;
+	indent_up();
+}
+
+t_struct* arg_struct = tfunction->get_arglist();
+const std::vector<t_field*>& fields = arg_struct->get_members();
+vector<t_field*>::const_iterator f_iter;
+
+f_service_ << indent();
+if (!tfunction->is_oneway() && !tfunction->get_returntype()->is_void()) {
+	f_service_ << "result.Success = ";
+}
+f_service_ << "iface_." << tfunction->get_name() << "(";
+bool first = true;
+for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+	if (first) {
+		first = false;
+	} else {
+		f_service_ << ", ";
+	}
+	f_service_ << "args." << prop_name(*f_iter);
+	if (!type_can_be_null((*f_iter)->get_type())) {
+		f_service_ << ".Value";
+	}
+}
+f_service_ << ");" << endl;
+
+if (!tfunction->is_oneway() && xceptions.size() > 0) {
+	indent_down();
+	f_service_ << indent() << "}";
+	for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
+		f_service_ << " catch ("
+				<< type_name((*x_iter)->get_type(), false, false) << " "
+				<< (*x_iter)->get_name() << ") {" << endl;
+		if (!tfunction->is_oneway()) {
+			indent_up();
+			f_service_ << indent() << "result." << prop_name(*x_iter) << " = "
+					<< (*x_iter)->get_name() << ";" << endl;
+			indent_down();
+			f_service_ << indent() << "}";
+		} else {
+			f_service_ << "}";
+		}
+	}
 	f_service_ << endl;
 }
 
+if (tfunction->is_oneway()) {
+	f_service_ << indent() << "return;" << endl;
+	scope_down(f_service_);
+
+	return;
+}
+
+f_service_ << indent() << "oprot.WriteMessageBegin(new TMessage(\""
+		<< tfunction->get_name() << "\", TMessageType.Reply, seqid)); " << endl
+		<< indent() << "result.Write(oprot);" << endl << indent()
+		<< "oprot.WriteMessageEnd();" << endl << indent()
+		<< "oprot.Transport.Flush();" << endl;
+
+scope_down(f_service_);
+
+f_service_ << endl;
+}
+
 void t_csharp5_generator::generate_csharp_union_reader(std::ofstream& out,
-		t_struct* tunion) {
-	// Thanks to THRIFT-1768, we don't need to check for required fields in the union
-	const vector<t_field*>& fields = tunion->get_members();
-	vector<t_field*>::const_iterator f_iter;
+	t_struct* tunion) {
+// Thanks to THRIFT-1768, we don't need to check for required fields in the union
+const vector<t_field*>& fields = tunion->get_members();
+vector<t_field*>::const_iterator f_iter;
 
-	indent(out) << "public static " << tunion->get_name()
-			<< " Read(TProtocol iprot)" << endl;
-	scope_up(out);
-	indent(out) << tunion->get_name() << " retval;" << endl;
-	indent(out) << "iprot.ReadStructBegin();" << endl;
-	indent(out) << "TField field = iprot.ReadFieldBegin();" << endl;
-	// we cannot have the first field be a stop -- we must have a single field defined
-	indent(out) << "if (field.Type == TType.Stop)" << endl;
-	scope_up(out);
-	indent(out) << "iprot.ReadFieldEnd();" << endl;
-	indent(out) << "retval = new ___undefined();" << endl;
-	scope_down(out);
-	indent(out) << "else" << endl;
-	scope_up(out);
-	indent(out) << "switch (field.ID)" << endl;
-	scope_up(out);
+indent(out) << "public static " << tunion->get_name()
+		<< " Read(TProtocol iprot)" << endl;
+scope_up(out);
+indent(out) << tunion->get_name() << " retval;" << endl;
+indent(out) << "iprot.ReadStructBegin();" << endl;
+indent(out) << "TField field = iprot.ReadFieldBegin();" << endl;
+// we cannot have the first field be a stop -- we must have a single field defined
+indent(out) << "if (field.Type == TType.Stop)" << endl;
+scope_up(out);
+indent(out) << "iprot.ReadFieldEnd();" << endl;
+indent(out) << "retval = new ___undefined();" << endl;
+scope_down(out);
+indent(out) << "else" << endl;
+scope_up(out);
+indent(out) << "switch (field.ID)" << endl;
+scope_up(out);
 
-	for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-		indent(out) << "case " << (*f_iter)->get_key() << ":" << endl;
-		indent_up();
-		indent(out) << "if (field.Type == "
-				<< type_to_enum((*f_iter)->get_type()) << ") {" << endl;
-		indent_up();
-
-		indent(out) << type_name((*f_iter)->get_type()) << " temp;" << endl;
-		generate_deserialize_field(out, (*f_iter), "temp", true);
-		indent(out) << "retval = new " << (*f_iter)->get_name() << "(temp);"
-				<< endl;
-
-		indent_down();
-		out << indent() << "} else { " << endl << indent()
-				<< "  TProtocolUtil.Skip(iprot, field.Type);" << endl
-				<< indent() << "  retval = new ___undefined();" << endl
-				<< indent() << "}" << endl << indent() << "break;" << endl;
-		indent_down();
-	}
-
-	indent(out) << "default: " << endl;
+for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+	indent(out) << "case " << (*f_iter)->get_key() << ":" << endl;
 	indent_up();
-	indent(out) << "TProtocolUtil.Skip(iprot, field.Type);" << endl << indent()
-			<< "retval = new ___undefined();" << endl;
-	indent(out) << "break;" << endl;
-	indent_down();
+	indent(out) << "if (field.Type == " << type_to_enum((*f_iter)->get_type())
+			<< ") {" << endl;
+	indent_up();
 
-	scope_down(out);
-
-	indent(out) << "iprot.ReadFieldEnd();" << endl;
-
-	indent(out) << "if (iprot.ReadFieldBegin().Type != TType.Stop)" << endl;
-	scope_up(out);
-	indent(out)
-			<< "throw new TProtocolException(TProtocolException.INVALID_DATA);"
+	indent(out) << type_name((*f_iter)->get_type()) << " temp;" << endl;
+	generate_deserialize_field(out, (*f_iter), "temp", true);
+	indent(out) << "retval = new " << (*f_iter)->get_name() << "(temp);"
 			<< endl;
-	scope_down(out);
-
-	// end of else for TStop
-	scope_down(out);
-
-	indent(out) << "iprot.ReadStructEnd();" << endl;
-
-	indent(out) << "return retval;" << endl;
 
 	indent_down();
+	out << indent() << "} else { " << endl << indent()
+			<< "  TProtocolUtil.Skip(iprot, field.Type);" << endl << indent()
+			<< "  retval = new ___undefined();" << endl << indent() << "}"
+			<< endl << indent() << "break;" << endl;
+	indent_down();
+}
 
-	indent(out) << "}" << endl << endl;
+indent(out) << "default: " << endl;
+indent_up();
+indent(out) << "TProtocolUtil.Skip(iprot, field.Type);" << endl << indent()
+		<< "retval = new ___undefined();" << endl;
+indent(out) << "break;" << endl;
+indent_down();
+
+scope_down(out);
+
+indent(out) << "iprot.ReadFieldEnd();" << endl;
+
+indent(out) << "if (iprot.ReadFieldBegin().Type != TType.Stop)" << endl;
+scope_up(out);
+indent(out) << "throw new TProtocolException(TProtocolException.INVALID_DATA);"
+		<< endl;
+scope_down(out);
+
+// end of else for TStop
+scope_down(out);
+
+indent(out) << "iprot.ReadStructEnd();" << endl;
+
+indent(out) << "return retval;" << endl;
+
+indent_down();
+
+indent(out) << "}" << endl << endl;
 }
 
 void t_csharp5_generator::generate_deserialize_field(ofstream& out,
-		t_field* tfield, string prefix, bool is_propertyless) {
-	t_type* type = tfield->get_type();
-	while (type->is_typedef()) {
-		type = ((t_typedef*) type)->get_type();
-	}
-
-	if (type->is_void()) {
-		throw "CANNOT GENERATE DESERIALIZE CODE FOR void TYPE: " + prefix
-				+ tfield->get_name();
-	}
-
-	string name = prefix + (is_propertyless ? "" : prop_name(tfield));
-
-	if (type->is_struct() || type->is_xception()) {
-		generate_deserialize_struct(out, (t_struct*) type, name);
-	} else if (type->is_container()) {
-		generate_deserialize_container(out, type, name);
-	} else if (type->is_base_type() || type->is_enum()) {
-		indent(out) << name << " = ";
-
-		if (type->is_enum()) {
-			out << "(" << type_name(type, false, true) << ")";
-		}
-
-		out << "iprot.";
-
-		if (type->is_base_type()) {
-			t_base_type::t_base tbase = ((t_base_type*) type)->get_base();
-			switch (tbase) {
-			case t_base_type::TYPE_VOID:
-				throw "compiler error: cannot serialize void field in a struct: "
-						+ name;
-				break;
-			case t_base_type::TYPE_STRING:
-				if (((t_base_type*) type)->is_binary()) {
-					out << "ReadBinary();";
-				} else {
-					out << "ReadString();";
-				}
-				break;
-			case t_base_type::TYPE_BOOL:
-				out << "ReadBool();";
-				break;
-			case t_base_type::TYPE_BYTE:
-				out << "ReadByte();";
-				break;
-			case t_base_type::TYPE_I16:
-				out << "ReadI16();";
-				break;
-			case t_base_type::TYPE_I32:
-				out << "ReadI32();";
-				break;
-			case t_base_type::TYPE_I64:
-				out << "ReadI64();";
-				break;
-			case t_base_type::TYPE_DOUBLE:
-				out << "ReadDouble();";
-				break;
-			default:
-				throw "compiler error: no C# name for base type " + tbase;
-			}
-		} else if (type->is_enum()) {
-			out << "ReadI32();";
-		}
-		out << endl;
-	} else {
-		printf("DO NOT KNOW HOW TO DESERIALIZE FIELD '%s' TYPE '%s'\n",
-				tfield->get_name().c_str(), type_name(type).c_str());
-	}
+	t_field* tfield, string prefix, bool is_propertyless) {
+t_type* type = tfield->get_type();
+while (type->is_typedef()) {
+	type = ((t_typedef*) type)->get_type();
 }
 
-void t_csharp5_generator::generate_deserialize_struct(ofstream& out,
-		t_struct* tstruct, string prefix) {
-	if (union_ && tstruct->is_union()) {
-		out << indent() << prefix << " = " << type_name(tstruct)
-				<< ".Read(iprot);" << endl;
-	} else {
-		out << indent() << prefix << " = new " << type_name(tstruct) << "();"
-				<< endl << indent() << prefix << ".Read(iprot);" << endl;
-	}
-}
-
-void t_csharp5_generator::generate_deserialize_container(ofstream& out,
-		t_type* ttype, string prefix) {
-	scope_up(out);
-
-	string obj;
-
-	if (ttype->is_map()) {
-		obj = tmp("_map");
-	} else if (ttype->is_set()) {
-		obj = tmp("_set");
-	} else if (ttype->is_list()) {
-		obj = tmp("_list");
-	}
-
-	indent(out) << prefix << " = new " << type_name(ttype, false, true) << "();"
-			<< endl;
-	if (ttype->is_map()) {
-		out << indent() << "TMap " << obj << " = iprot.ReadMapBegin();" << endl;
-	} else if (ttype->is_set()) {
-		out << indent() << "TSet " << obj << " = iprot.ReadSetBegin();" << endl;
-	} else if (ttype->is_list()) {
-		out << indent() << "TList " << obj << " = iprot.ReadListBegin();"
-				<< endl;
-	}
-
-	string i = tmp("_i");
-	indent(out) << "for( int " << i << " = 0; " << i << " < " << obj << ".Count"
-			<< "; " << "++" << i << ")" << endl;
-	scope_up(out);
-
-	if (ttype->is_map()) {
-		generate_deserialize_map_element(out, (t_map*) ttype, prefix);
-	} else if (ttype->is_set()) {
-		generate_deserialize_set_element(out, (t_set*) ttype, prefix);
-	} else if (ttype->is_list()) {
-		generate_deserialize_list_element(out, (t_list*) ttype, prefix);
-	}
-
-	scope_down(out);
-
-	if (ttype->is_map()) {
-		indent(out) << "iprot.ReadMapEnd();" << endl;
-	} else if (ttype->is_set()) {
-		indent(out) << "iprot.ReadSetEnd();" << endl;
-	} else if (ttype->is_list()) {
-		indent(out) << "iprot.ReadListEnd();" << endl;
-	}
-
-	scope_down(out);
-}
-
-void t_csharp5_generator::generate_deserialize_map_element(ofstream& out,
-		t_map* tmap, string prefix) {
-	string key = tmp("_key");
-	string val = tmp("_val");
-
-	t_field fkey(tmap->get_key_type(), key);
-	t_field fval(tmap->get_val_type(), val);
-
-	indent(out) << declare_field(&fkey) << endl;
-	indent(out) << declare_field(&fval) << endl;
-
-	generate_deserialize_field(out, &fkey);
-	generate_deserialize_field(out, &fval);
-
-	indent(out) << prefix << "[" << key << "] = " << val << ";" << endl;
-}
-
-void t_csharp5_generator::generate_deserialize_set_element(ofstream& out,
-		t_set* tset, string prefix) {
-	string elem = tmp("_elem");
-	t_field felem(tset->get_elem_type(), elem);
-
-	indent(out) << declare_field(&felem, true) << endl;
-
-	generate_deserialize_field(out, &felem);
-
-	indent(out) << prefix << ".Add(" << elem << ");" << endl;
-}
-
-void t_csharp5_generator::generate_deserialize_list_element(ofstream& out,
-		t_list* tlist, string prefix) {
-	string elem = tmp("_elem");
-	t_field felem(tlist->get_elem_type(), elem);
-
-	indent(out) << declare_field(&felem, true) << endl;
-
-	generate_deserialize_field(out, &felem);
-
-	indent(out) << prefix << ".Add(" << elem << ");" << endl;
-}
-
-void t_csharp5_generator::generate_serialize_field(ofstream& out,
-		t_field* tfield, string prefix, bool is_element, bool is_propertyless) {
-	t_type* type = tfield->get_type();
-	while (type->is_typedef()) {
-		type = ((t_typedef*) type)->get_type();
-	}
-
-	string name = prefix + (is_propertyless ? "" : prop_name(tfield));
-
-	if (type->is_void()) {
-		throw "CANNOT GENERATE SERIALIZE CODE FOR void TYPE: " + name;
-	}
-
-	if (type->is_struct() || type->is_xception()) {
-		generate_serialize_struct(out, (t_struct*) type, name);
-	} else if (type->is_container()) {
-		generate_serialize_container(out, type, name);
-	} else if (type->is_base_type() || type->is_enum()) {
-		indent(out) << "oprot.";
-
-		string nullable_name =
-				nullable_ && !is_element && !field_is_required(tfield) ?
-						name + ".Value" : name;
-
-		if (type->is_base_type()) {
-			t_base_type::t_base tbase = ((t_base_type*) type)->get_base();
-			switch (tbase) {
-			case t_base_type::TYPE_VOID:
-				throw "compiler error: cannot serialize void field in a struct: "
-						+ name;
-				break;
-			case t_base_type::TYPE_STRING:
-				if (((t_base_type*) type)->is_binary()) {
-					out << "WriteBinary(";
-				} else {
-					out << "WriteString(";
-				}
-				out << name << ");";
-				break;
-			case t_base_type::TYPE_BOOL:
-				out << "WriteBool(" << nullable_name << ");";
-				break;
-			case t_base_type::TYPE_BYTE:
-				out << "WriteByte(" << nullable_name << ");";
-				break;
-			case t_base_type::TYPE_I16:
-				out << "WriteI16(" << nullable_name << ");";
-				break;
-			case t_base_type::TYPE_I32:
-				out << "WriteI32(" << nullable_name << ");";
-				break;
-			case t_base_type::TYPE_I64:
-				out << "WriteI64(" << nullable_name << ");";
-				break;
-			case t_base_type::TYPE_DOUBLE:
-				out << "WriteDouble(" << nullable_name << ");";
-				break;
-			default:
-				throw "compiler error: no C# name for base type " + tbase;
-			}
-		} else if (type->is_enum()) {
-			out << "WriteI32((int)" << nullable_name << ");";
-		}
-		out << endl;
-	} else {
-		printf("DO NOT KNOW HOW TO SERIALIZE '%s%s' TYPE '%s'\n",
-				prefix.c_str(), tfield->get_name().c_str(),
-				type_name(type).c_str());
-	}
-}
-
-void t_csharp5_generator::generate_serialize_struct(ofstream& out,
-		t_struct* tstruct, string prefix) {
-	(void) tstruct;
-	out << indent() << prefix << ".Write(oprot);" << endl;
-}
-
-void t_csharp5_generator::generate_serialize_container(ofstream& out,
-		t_type* ttype, string prefix) {
-	scope_up(out);
-
-	if (ttype->is_map()) {
-		indent(out) << "oprot.WriteMapBegin(new TMap("
-				<< type_to_enum(((t_map*) ttype)->get_key_type()) << ", "
-				<< type_to_enum(((t_map*) ttype)->get_val_type()) << ", "
-				<< prefix << ".Count));" << endl;
-	} else if (ttype->is_set()) {
-		indent(out) << "oprot.WriteSetBegin(new TSet("
-				<< type_to_enum(((t_set*) ttype)->get_elem_type()) << ", "
-				<< prefix << ".Count));" << endl;
-	} else if (ttype->is_list()) {
-		indent(out) << "oprot.WriteListBegin(new TList("
-				<< type_to_enum(((t_list*) ttype)->get_elem_type()) << ", "
-				<< prefix << ".Count));" << endl;
-	}
-
-	string iter = tmp("_iter");
-	if (ttype->is_map()) {
-		indent(out) << "foreach ("
-				<< type_name(((t_map*) ttype)->get_key_type()) << " " << iter
-				<< " in " << prefix << ".Keys)";
-	} else if (ttype->is_set()) {
-		indent(out) << "foreach ("
-				<< type_name(((t_set*) ttype)->get_elem_type()) << " " << iter
-				<< " in " << prefix << ")";
-	} else if (ttype->is_list()) {
-		indent(out) << "foreach ("
-				<< type_name(((t_list*) ttype)->get_elem_type()) << " " << iter
-				<< " in " << prefix << ")";
-	}
-
-	out << endl;
-	scope_up(out);
-
-	if (ttype->is_map()) {
-		generate_serialize_map_element(out, (t_map*) ttype, iter, prefix);
-	} else if (ttype->is_set()) {
-		generate_serialize_set_element(out, (t_set*) ttype, iter);
-	} else if (ttype->is_list()) {
-		generate_serialize_list_element(out, (t_list*) ttype, iter);
-	}
-
-	scope_down(out);
-
-	if (ttype->is_map()) {
-		indent(out) << "oprot.WriteMapEnd();" << endl;
-	} else if (ttype->is_set()) {
-		indent(out) << "oprot.WriteSetEnd();" << endl;
-	} else if (ttype->is_list()) {
-		indent(out) << "oprot.WriteListEnd();" << endl;
-	}
-
-	scope_down(out);
-}
-
-void t_csharp5_generator::generate_serialize_map_element(ofstream& out,
-		t_map* tmap, string iter, string map) {
-	t_field kfield(tmap->get_key_type(), iter);
-	generate_serialize_field(out, &kfield, "", true);
-	t_field vfield(tmap->get_val_type(), map + "[" + iter + "]");
-	generate_serialize_field(out, &vfield, "", true);
-}
-
-void t_csharp5_generator::generate_serialize_set_element(ofstream& out,
-		t_set* tset, string iter) {
-	t_field efield(tset->get_elem_type(), iter);
-	generate_serialize_field(out, &efield, "", true);
-}
-
-void t_csharp5_generator::generate_serialize_list_element(ofstream& out,
-		t_list* tlist, string iter) {
-	t_field efield(tlist->get_elem_type(), iter);
-	generate_serialize_field(out, &efield, "", true);
-}
-
-void t_csharp5_generator::generate_property(ofstream& out, t_field* tfield,
-		bool isPublic, bool generateIsset) {
-	generate_csharp_property(out, tfield, isPublic, generateIsset, "_");
-}
-void t_csharp5_generator::generate_csharp_property(ofstream& out,
-		t_field* tfield, bool isPublic, bool generateIsset,
-		std::string fieldPrefix) {
-	if ((serialize_ || wcf_) && isPublic) {
-		indent(out) << "[DataMember]" << endl;
-	}
-	bool has_default = field_has_default(tfield);
-	bool is_required = field_is_required(tfield);
-	if ((nullable_ && !has_default) || (is_required)) {
-		indent(out) << (isPublic ? "public " : "private ")
-				<< type_name(tfield->get_type(), false, false, true,
-						is_required) << " " << prop_name(tfield)
-				<< " { get; set; }" << endl;
-	} else {
-		indent(out) << (isPublic ? "public " : "private ")
-				<< type_name(tfield->get_type(), false, false, true) << " "
-				<< prop_name(tfield) << endl;
-		scope_up(out);
-		indent(out) << "get" << endl;
-		scope_up(out);
-		bool use_nullable = false;
-		if (nullable_) {
-			t_type* ttype = tfield->get_type();
-			while (ttype->is_typedef()) {
-				ttype = ((t_typedef*) ttype)->get_type();
-			}
-			if (ttype->is_base_type()) {
-				use_nullable = ((t_base_type*) ttype)->get_base()
-						!= t_base_type::TYPE_STRING;
-			}
-		}
-		indent(out) << "return " << fieldPrefix + tfield->get_name() << ";"
-				<< endl;
-		scope_down(out);
-		indent(out) << "set" << endl;
-		scope_up(out);
-		if (use_nullable) {
-			if (generateIsset) {
-				indent(out) << "__isset." << tfield->get_name()
-						<< " = value.HasValue;" << endl;
-			}
-			indent(out) << "if (value.HasValue) this."
-					<< fieldPrefix + tfield->get_name() << " = value.Value;"
-					<< endl;
-		} else {
-			if (generateIsset) {
-				indent(out) << "__isset." << tfield->get_name() << " = true;"
-						<< endl;
-			}
-			indent(out) << "this." << fieldPrefix + tfield->get_name()
-					<< " = value;" << endl;
-		}
-		scope_down(out);
-		scope_down(out);
-	}
-	out << endl;
-}
-
-std::string t_csharp5_generator::prop_name(t_field* tfield) {
-	string name(tfield->get_name());
-	name[0] = toupper(name[0]);
-	return name;
-}
-
-string t_csharp5_generator::type_name(t_type* ttype, bool in_container,
-		bool in_init, bool in_param, bool is_required) {
-	(void) in_init;
-	while (ttype->is_typedef()) {
-		ttype = ((t_typedef*) ttype)->get_type();
-	}
-
-	if (ttype->is_base_type()) {
-		return base_type_name((t_base_type*) ttype, in_container, in_param,
-				is_required);
-	} else if (ttype->is_map()) {
-		t_map *tmap = (t_map*) ttype;
-		return "Dictionary<" + type_name(tmap->get_key_type(), true) + ", "
-				+ type_name(tmap->get_val_type(), true) + ">";
-	} else if (ttype->is_set()) {
-		t_set* tset = (t_set*) ttype;
-		return "THashSet<" + type_name(tset->get_elem_type(), true) + ">";
-	} else if (ttype->is_list()) {
-		t_list* tlist = (t_list*) ttype;
-		return "List<" + type_name(tlist->get_elem_type(), true) + ">";
-	}
-
-	t_program* program = ttype->get_program();
-	string postfix =
-			(!is_required && nullable_ && in_param && ttype->is_enum()) ?
-					"?" : "";
-	if (program != NULL && program != program_) {
-		string ns = program->get_namespace("csharp");
-		if (!ns.empty()) {
-			return ns + "." + ttype->get_name() + postfix;
-		}
-	}
-
-	return ttype->get_name() + postfix;
-}
-
-string t_csharp5_generator::base_type_name(t_base_type* tbase,
-		bool in_container, bool in_param, bool is_required) {
-	(void) in_container;
-	string postfix = (!is_required && nullable_ && in_param) ? "?" : "";
-	switch (tbase->get_base()) {
-	case t_base_type::TYPE_VOID:
-		return "void";
-	case t_base_type::TYPE_STRING:
-		if (tbase->is_binary()) {
-			return "byte[]";
-		} else {
-			return "string";
-		}
-	case t_base_type::TYPE_BOOL:
-		return "bool" + postfix;
-	case t_base_type::TYPE_BYTE:
-		return "sbyte" + postfix;
-	case t_base_type::TYPE_I16:
-		return "short" + postfix;
-	case t_base_type::TYPE_I32:
-		return "int" + postfix;
-	case t_base_type::TYPE_I64:
-		return "long" + postfix;
-	case t_base_type::TYPE_DOUBLE:
-		return "double" + postfix;
-	default:
-		throw "compiler error: no C# name for base type " + tbase->get_base();
-	}
-}
-
-string t_csharp5_generator::declare_field(t_field* tfield, bool init,
-		std::string prefix) {
-	string result = type_name(tfield->get_type()) + " " + prefix
+if (type->is_void()) {
+	throw "CANNOT GENERATE DESERIALIZE CODE FOR void TYPE: " + prefix
 			+ tfield->get_name();
-	if (init) {
-		t_type* ttype = tfield->get_type();
-		while (ttype->is_typedef()) {
-			ttype = ((t_typedef*) ttype)->get_type();
-		}
-		if (ttype->is_base_type() && field_has_default(tfield)) {
-			ofstream dummy;
-			result += " = "
-					+ render_const_value(dummy, tfield->get_name(), ttype,
-							tfield->get_value());
-		} else if (ttype->is_base_type()) {
-			t_base_type::t_base tbase = ((t_base_type*) ttype)->get_base();
-			switch (tbase) {
-			case t_base_type::TYPE_VOID:
-				throw "NO T_VOID CONSTRUCT";
-			case t_base_type::TYPE_STRING:
-				result += " = null";
-				break;
-			case t_base_type::TYPE_BOOL:
-				result += " = false";
-				break;
-			case t_base_type::TYPE_BYTE:
-			case t_base_type::TYPE_I16:
-			case t_base_type::TYPE_I32:
-			case t_base_type::TYPE_I64:
-				result += " = 0";
-				break;
-			case t_base_type::TYPE_DOUBLE:
-				result += " = (double)0";
-				break;
-			}
-		} else if (ttype->is_enum()) {
-			result += " = (" + type_name(ttype, false, true) + ")0";
-		} else if (ttype->is_container()) {
-			result += " = new " + type_name(ttype, false, true) + "()";
-		} else {
-			result += " = new " + type_name(ttype, false, true) + "()";
-		}
+}
+
+string name = prefix + (is_propertyless ? "" : prop_name(tfield));
+
+if (type->is_struct() || type->is_xception()) {
+	generate_deserialize_struct(out, (t_struct*) type, name);
+} else if (type->is_container()) {
+	generate_deserialize_container(out, type, name);
+} else if (type->is_base_type() || type->is_enum()) {
+	indent(out) << name << " = ";
+
+	if (type->is_enum()) {
+		out << "(" << type_name(type, false, true) << ")";
 	}
-	return result + ";";
-}
 
-string t_csharp5_generator::function_signature(t_function* tfunction,
-		string prefix) {
-	t_type* ttype = tfunction->get_returntype();
-	return type_name(ttype) + " " + prefix + tfunction->get_name() + "("
-			+ argument_list(tfunction->get_arglist()) + ")";
-}
-
-string t_csharp5_generator::function_signature_async_begin(
-		t_function* tfunction, string prefix) {
-	string comma = (
-			tfunction->get_arglist()->get_members().size() > 0 ? ", " : "");
-	return "IAsyncResult " + prefix + tfunction->get_name()
-			+ "(AsyncCallback callback, object state" + comma
-			+ argument_list(tfunction->get_arglist()) + ")";
-}
-
-string t_csharp5_generator::function_signature_async_end(t_function* tfunction,
-		string prefix) {
-	t_type* ttype = tfunction->get_returntype();
-	return type_name(ttype) + " " + prefix + tfunction->get_name()
-			+ "(IAsyncResult asyncResult)";
-}
-
-string t_csharp5_generator::function_signature_async(t_function* tfunction,
-		string prefix) {
-	t_type* ttype = tfunction->get_returntype();
-	string task = "Task";
-	if (!ttype->is_void())
-		task += "<" + type_name(ttype) + ">";
-	return task + " " + prefix + tfunction->get_name() + "Async("
-			+ argument_list(tfunction->get_arglist()) + ")";
-}
-
-string t_csharp5_generator::argument_list(t_struct* tstruct) {
-	string result = "";
-	const vector<t_field*>& fields = tstruct->get_members();
-	vector<t_field*>::const_iterator f_iter;
-	bool first = true;
-	for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-		if (first) {
-			first = false;
-		} else {
-			result += ", ";
-		}
-		result += type_name((*f_iter)->get_type()) + " "
-				+ (*f_iter)->get_name();
-	}
-	return result;
-}
-
-string t_csharp5_generator::type_to_enum(t_type* type) {
-	while (type->is_typedef()) {
-		type = ((t_typedef*) type)->get_type();
-	}
+	out << "iprot.";
 
 	if (type->is_base_type()) {
 		t_base_type::t_base tbase = ((t_base_type*) type)->get_base();
 		switch (tbase) {
 		case t_base_type::TYPE_VOID:
-			throw "NO T_VOID CONSTRUCT";
+			throw "compiler error: cannot serialize void field in a struct: "
+					+ name;
+			break;
 		case t_base_type::TYPE_STRING:
-			return "TType.String";
+			if (((t_base_type*) type)->is_binary()) {
+				out << "ReadBinary();";
+			} else {
+				out << "ReadString();";
+			}
+			break;
 		case t_base_type::TYPE_BOOL:
-			return "TType.Bool";
+			out << "ReadBool();";
+			break;
 		case t_base_type::TYPE_BYTE:
-			return "TType.Byte";
+			out << "ReadByte();";
+			break;
 		case t_base_type::TYPE_I16:
-			return "TType.I16";
+			out << "ReadI16();";
+			break;
 		case t_base_type::TYPE_I32:
-			return "TType.I32";
+			out << "ReadI32();";
+			break;
 		case t_base_type::TYPE_I64:
-			return "TType.I64";
+			out << "ReadI64();";
+			break;
 		case t_base_type::TYPE_DOUBLE:
-			return "TType.Double";
+			out << "ReadDouble();";
+			break;
+		default:
+			throw "compiler error: no C# name for base type " + tbase;
 		}
 	} else if (type->is_enum()) {
-		return "TType.I32";
-	} else if (type->is_struct() || type->is_xception()) {
-		return "TType.Struct";
-	} else if (type->is_map()) {
-		return "TType.Map";
-	} else if (type->is_set()) {
-		return "TType.Set";
-	} else if (type->is_list()) {
-		return "TType.List";
+		out << "ReadI32();";
 	}
+	out << endl;
+} else {
+	printf("DO NOT KNOW HOW TO DESERIALIZE FIELD '%s' TYPE '%s'\n",
+			tfield->get_name().c_str(), type_name(type).c_str());
+}
+}
 
-	throw "INVALID TYPE IN type_to_enum: " + type->get_name();
+void t_csharp5_generator::generate_deserialize_struct(ofstream& out,
+	t_struct* tstruct, string prefix) {
+if (tstruct->is_union()) {
+	out << indent() << prefix << " = " << type_name(tstruct) << ".Read(iprot);"
+			<< endl;
+} else {
+	out << indent() << prefix << " = new " << type_name(tstruct) << "();"
+			<< endl << indent() << prefix << ".Read(iprot);" << endl;
+}
+}
+
+void t_csharp5_generator::generate_deserialize_container(ofstream& out,
+	t_type* ttype, string prefix) {
+scope_up(out);
+
+string obj;
+
+if (ttype->is_map()) {
+	obj = tmp("_map");
+} else if (ttype->is_set()) {
+	obj = tmp("_set");
+} else if (ttype->is_list()) {
+	obj = tmp("_list");
+}
+
+indent(out) << prefix << " = new " << type_name(ttype, false, true) << "();"
+		<< endl;
+if (ttype->is_map()) {
+	out << indent() << "TMap " << obj << " = iprot.ReadMapBegin();" << endl;
+} else if (ttype->is_set()) {
+	out << indent() << "TSet " << obj << " = iprot.ReadSetBegin();" << endl;
+} else if (ttype->is_list()) {
+	out << indent() << "TList " << obj << " = iprot.ReadListBegin();" << endl;
+}
+
+string i = tmp("_i");
+indent(out) << "for( int " << i << " = 0; " << i << " < " << obj << ".Count"
+		<< "; " << "++" << i << ")" << endl;
+scope_up(out);
+
+if (ttype->is_map()) {
+	generate_deserialize_map_element(out, (t_map*) ttype, prefix);
+} else if (ttype->is_set()) {
+	generate_deserialize_set_element(out, (t_set*) ttype, prefix);
+} else if (ttype->is_list()) {
+	generate_deserialize_list_element(out, (t_list*) ttype, prefix);
+}
+
+scope_down(out);
+
+if (ttype->is_map()) {
+	indent(out) << "iprot.ReadMapEnd();" << endl;
+} else if (ttype->is_set()) {
+	indent(out) << "iprot.ReadSetEnd();" << endl;
+} else if (ttype->is_list()) {
+	indent(out) << "iprot.ReadListEnd();" << endl;
+}
+
+scope_down(out);
+}
+
+void t_csharp5_generator::generate_deserialize_map_element(ofstream& out,
+	t_map* tmap, string prefix) {
+string key = tmp("_key");
+string val = tmp("_val");
+
+t_field fkey(tmap->get_key_type(), key);
+t_field fval(tmap->get_val_type(), val);
+
+indent(out) << declare_field(&fkey) << endl;
+indent(out) << declare_field(&fval) << endl;
+
+generate_deserialize_field(out, &fkey);
+generate_deserialize_field(out, &fval);
+
+indent(out) << prefix << "[" << key << "] = " << val << ";" << endl;
+}
+
+void t_csharp5_generator::generate_deserialize_set_element(ofstream& out,
+	t_set* tset, string prefix) {
+string elem = tmp("_elem");
+t_field felem(tset->get_elem_type(), elem);
+
+indent(out) << declare_field(&felem, true) << endl;
+
+generate_deserialize_field(out, &felem);
+
+indent(out) << prefix << ".Add(" << elem << ");" << endl;
+}
+
+void t_csharp5_generator::generate_deserialize_list_element(ofstream& out,
+	t_list* tlist, string prefix) {
+string elem = tmp("_elem");
+t_field felem(tlist->get_elem_type(), elem);
+
+indent(out) << declare_field(&felem, true) << endl;
+
+generate_deserialize_field(out, &felem);
+
+indent(out) << prefix << ".Add(" << elem << ");" << endl;
+}
+
+void t_csharp5_generator::generate_serialize_field(ofstream& out,
+	t_field* tfield, string prefix, bool is_element, bool is_propertyless) {
+t_type* type = tfield->get_type();
+while (type->is_typedef()) {
+	type = ((t_typedef*) type)->get_type();
+}
+
+string name = prefix + (is_propertyless ? "" : prop_name(tfield));
+
+if (type->is_void()) {
+	throw "CANNOT GENERATE SERIALIZE CODE FOR void TYPE: " + name;
+}
+
+if (type->is_struct() || type->is_xception()) {
+	generate_serialize_struct(out, (t_struct*) type, name);
+} else if (type->is_container()) {
+	generate_serialize_container(out, type, name);
+} else if (type->is_base_type() || type->is_enum()) {
+	indent(out) << "oprot.";
+
+	string nullable_name =
+			nullable_ && !is_element && !field_is_required(tfield) ?
+					name + ".Value" : name;
+
+	if (type->is_base_type()) {
+		t_base_type::t_base tbase = ((t_base_type*) type)->get_base();
+		switch (tbase) {
+		case t_base_type::TYPE_VOID:
+			throw "compiler error: cannot serialize void field in a struct: "
+					+ name;
+			break;
+		case t_base_type::TYPE_STRING:
+			if (((t_base_type*) type)->is_binary()) {
+				out << "WriteBinary(";
+			} else {
+				out << "WriteString(";
+			}
+			out << name << ");";
+			break;
+		case t_base_type::TYPE_BOOL:
+			out << "WriteBool(" << nullable_name << ");";
+			break;
+		case t_base_type::TYPE_BYTE:
+			out << "WriteByte(" << nullable_name << ");";
+			break;
+		case t_base_type::TYPE_I16:
+			out << "WriteI16(" << nullable_name << ");";
+			break;
+		case t_base_type::TYPE_I32:
+			out << "WriteI32(" << nullable_name << ");";
+			break;
+		case t_base_type::TYPE_I64:
+			out << "WriteI64(" << nullable_name << ");";
+			break;
+		case t_base_type::TYPE_DOUBLE:
+			out << "WriteDouble(" << nullable_name << ");";
+			break;
+		default:
+			throw "compiler error: no C# name for base type " + tbase;
+		}
+	} else if (type->is_enum()) {
+		out << "WriteI32((int)" << nullable_name << ");";
+	}
+	out << endl;
+} else {
+	printf("DO NOT KNOW HOW TO SERIALIZE '%s%s' TYPE '%s'\n", prefix.c_str(),
+			tfield->get_name().c_str(), type_name(type).c_str());
+}
+}
+
+void t_csharp5_generator::generate_serialize_struct(ofstream& out,
+	t_struct* tstruct, string prefix) {
+(void) tstruct;
+out << indent() << prefix << ".Write(oprot);" << endl;
+}
+
+void t_csharp5_generator::generate_serialize_container(ofstream& out,
+	t_type* ttype, string prefix) {
+scope_up(out);
+
+if (ttype->is_map()) {
+	indent(out) << "oprot.WriteMapBegin(new TMap("
+			<< type_to_enum(((t_map*) ttype)->get_key_type()) << ", "
+			<< type_to_enum(((t_map*) ttype)->get_val_type()) << ", " << prefix
+			<< ".Count));" << endl;
+} else if (ttype->is_set()) {
+	indent(out) << "oprot.WriteSetBegin(new TSet("
+			<< type_to_enum(((t_set*) ttype)->get_elem_type()) << ", " << prefix
+			<< ".Count));" << endl;
+} else if (ttype->is_list()) {
+	indent(out) << "oprot.WriteListBegin(new TList("
+			<< type_to_enum(((t_list*) ttype)->get_elem_type()) << ", "
+			<< prefix << ".Count));" << endl;
+}
+
+string iter = tmp("_iter");
+if (ttype->is_map()) {
+	indent(out) << "foreach (" << type_name(((t_map*) ttype)->get_key_type())
+			<< " " << iter << " in " << prefix << ".Keys)";
+} else if (ttype->is_set()) {
+	indent(out) << "foreach (" << type_name(((t_set*) ttype)->get_elem_type())
+			<< " " << iter << " in " << prefix << ")";
+} else if (ttype->is_list()) {
+	indent(out) << "foreach (" << type_name(((t_list*) ttype)->get_elem_type())
+			<< " " << iter << " in " << prefix << ")";
+}
+
+out << endl;
+scope_up(out);
+
+if (ttype->is_map()) {
+	generate_serialize_map_element(out, (t_map*) ttype, iter, prefix);
+} else if (ttype->is_set()) {
+	generate_serialize_set_element(out, (t_set*) ttype, iter);
+} else if (ttype->is_list()) {
+	generate_serialize_list_element(out, (t_list*) ttype, iter);
+}
+
+scope_down(out);
+
+if (ttype->is_map()) {
+	indent(out) << "oprot.WriteMapEnd();" << endl;
+} else if (ttype->is_set()) {
+	indent(out) << "oprot.WriteSetEnd();" << endl;
+} else if (ttype->is_list()) {
+	indent(out) << "oprot.WriteListEnd();" << endl;
+}
+
+scope_down(out);
+}
+
+void t_csharp5_generator::generate_serialize_map_element(ofstream& out,
+	t_map* tmap, string iter, string map) {
+t_field kfield(tmap->get_key_type(), iter);
+generate_serialize_field(out, &kfield, "", true);
+t_field vfield(tmap->get_val_type(), map + "[" + iter + "]");
+generate_serialize_field(out, &vfield, "", true);
+}
+
+void t_csharp5_generator::generate_serialize_set_element(ofstream& out,
+	t_set* tset, string iter) {
+t_field efield(tset->get_elem_type(), iter);
+generate_serialize_field(out, &efield, "", true);
+}
+
+void t_csharp5_generator::generate_serialize_list_element(ofstream& out,
+	t_list* tlist, string iter) {
+t_field efield(tlist->get_elem_type(), iter);
+generate_serialize_field(out, &efield, "", true);
+}
+
+void t_csharp5_generator::generate_property(ofstream& out, t_field* tfield,
+	bool isPublic, bool generateIsset) {
+generate_csharp_property(out, tfield, isPublic, generateIsset, "_");
+}
+void t_csharp5_generator::generate_csharp_property(ofstream& out,
+	t_field* tfield, bool isPublic, bool generateIsset,
+	std::string fieldPrefix) {
+if ((serialize_ || wcf_) && isPublic) {
+	indent(out) << "[DataMember]" << endl;
+}
+bool has_default = field_has_default(tfield);
+bool is_required = field_is_required(tfield);
+if ((nullable_ && !has_default) || (is_required)) {
+	indent(out) << (isPublic ? "public " : "private ")
+			<< type_name(tfield->get_type(), false, false, true, is_required)
+			<< " " << prop_name(tfield) << " { get; set; }" << endl;
+} else {
+	indent(out) << (isPublic ? "public " : "private ")
+			<< type_name(tfield->get_type(), false, false, true) << " "
+			<< prop_name(tfield) << endl;
+	scope_up(out);
+	indent(out) << "get" << endl;
+	scope_up(out);
+	bool use_nullable = false;
+	if (nullable_) {
+		t_type* ttype = tfield->get_type();
+		while (ttype->is_typedef()) {
+			ttype = ((t_typedef*) ttype)->get_type();
+		}
+		if (ttype->is_base_type()) {
+			use_nullable = ((t_base_type*) ttype)->get_base()
+					!= t_base_type::TYPE_STRING;
+		}
+	}
+	indent(out) << "return " << fieldPrefix + tfield->get_name() << ";" << endl;
+	scope_down(out);
+	indent(out) << "set" << endl;
+	scope_up(out);
+	if (use_nullable) {
+		if (generateIsset) {
+			indent(out) << "__isset." << tfield->get_name()
+					<< " = value.HasValue;" << endl;
+		}
+		indent(out) << "if (value.HasValue) this."
+				<< fieldPrefix + tfield->get_name() << " = value.Value;"
+				<< endl;
+	} else {
+		if (generateIsset) {
+			indent(out) << "__isset." << tfield->get_name() << " = true;"
+					<< endl;
+		}
+		indent(out) << "this." << fieldPrefix + tfield->get_name()
+				<< " = value;" << endl;
+	}
+	scope_down(out);
+	scope_down(out);
+}
+out << endl;
+}
+
+std::string t_csharp5_generator::prop_name(t_field* tfield) {
+string name(tfield->get_name());
+name[0] = toupper(name[0]);
+return name;
+}
+
+string t_csharp5_generator::type_name(t_type* ttype, bool in_container,
+	bool in_init, bool in_param, bool is_required) {
+(void) in_init;
+while (ttype->is_typedef()) {
+	ttype = ((t_typedef*) ttype)->get_type();
+}
+
+if (ttype->is_base_type()) {
+	return base_type_name((t_base_type*) ttype, in_container, in_param,
+			is_required);
+} else if (ttype->is_map()) {
+	t_map *tmap = (t_map*) ttype;
+	return "Dictionary<" + type_name(tmap->get_key_type(), true) + ", "
+			+ type_name(tmap->get_val_type(), true) + ">";
+} else if (ttype->is_set()) {
+	t_set* tset = (t_set*) ttype;
+	return "THashSet<" + type_name(tset->get_elem_type(), true) + ">";
+} else if (ttype->is_list()) {
+	t_list* tlist = (t_list*) ttype;
+	return "List<" + type_name(tlist->get_elem_type(), true) + ">";
+}
+
+t_program* program = ttype->get_program();
+string postfix =
+		(!is_required && nullable_ && in_param && ttype->is_enum()) ? "?" : "";
+if (program != NULL && program != program_) {
+	string ns = program->get_namespace("csharp");
+	if (!ns.empty()) {
+		return ns + "." + ttype->get_name() + postfix;
+	}
+}
+
+return ttype->get_name() + postfix;
+}
+
+string t_csharp5_generator::base_type_name(t_base_type* tbase,
+	bool in_container, bool in_param, bool is_required) {
+(void) in_container;
+string postfix = (!is_required && nullable_ && in_param) ? "?" : "";
+switch (tbase->get_base()) {
+case t_base_type::TYPE_VOID:
+	return "void";
+case t_base_type::TYPE_STRING:
+	if (tbase->is_binary()) {
+		return "byte[]";
+	} else {
+		return "string";
+	}
+case t_base_type::TYPE_BOOL:
+	return "bool" + postfix;
+case t_base_type::TYPE_BYTE:
+	return "sbyte" + postfix;
+case t_base_type::TYPE_I16:
+	return "short" + postfix;
+case t_base_type::TYPE_I32:
+	return "int" + postfix;
+case t_base_type::TYPE_I64:
+	return "long" + postfix;
+case t_base_type::TYPE_DOUBLE:
+	return "double" + postfix;
+default:
+	throw "compiler error: no C# name for base type " + tbase->get_base();
+}
+}
+
+string t_csharp5_generator::declare_field(t_field* tfield, bool init,
+	std::string prefix) {
+string result = type_name(tfield->get_type()) + " " + prefix
+		+ tfield->get_name();
+if (init) {
+	t_type* ttype = tfield->get_type();
+	while (ttype->is_typedef()) {
+		ttype = ((t_typedef*) ttype)->get_type();
+	}
+	if (ttype->is_base_type() && field_has_default(tfield)) {
+		ofstream dummy;
+		result += " = "
+				+ render_const_value(dummy, tfield->get_name(), ttype,
+						tfield->get_value());
+	} else if (ttype->is_base_type()) {
+		t_base_type::t_base tbase = ((t_base_type*) ttype)->get_base();
+		switch (tbase) {
+		case t_base_type::TYPE_VOID:
+			throw "NO T_VOID CONSTRUCT";
+		case t_base_type::TYPE_STRING:
+			result += " = null";
+			break;
+		case t_base_type::TYPE_BOOL:
+			result += " = false";
+			break;
+		case t_base_type::TYPE_BYTE:
+		case t_base_type::TYPE_I16:
+		case t_base_type::TYPE_I32:
+		case t_base_type::TYPE_I64:
+			result += " = 0";
+			break;
+		case t_base_type::TYPE_DOUBLE:
+			result += " = (double)0";
+			break;
+		}
+	} else if (ttype->is_enum()) {
+		result += " = (" + type_name(ttype, false, true) + ")0";
+	} else if (ttype->is_container()) {
+		result += " = new " + type_name(ttype, false, true) + "()";
+	} else {
+		result += " = new " + type_name(ttype, false, true) + "()";
+	}
+}
+return result + ";";
+}
+
+string t_csharp5_generator::function_signature(t_function* tfunction,
+	string prefix) {
+t_type* ttype = tfunction->get_returntype();
+return type_name(ttype) + " " + prefix + tfunction->get_name() + "("
+		+ argument_list(tfunction->get_arglist()) + ")";
+}
+
+string t_csharp5_generator::function_signature_async_begin(
+	t_function* tfunction, string prefix) {
+string comma = (tfunction->get_arglist()->get_members().size() > 0 ? ", " : "");
+return "IAsyncResult " + prefix + tfunction->get_name()
+		+ "(AsyncCallback callback, object state" + comma
+		+ argument_list(tfunction->get_arglist()) + ")";
+}
+
+string t_csharp5_generator::function_signature_async_end(t_function* tfunction,
+	string prefix) {
+t_type* ttype = tfunction->get_returntype();
+return type_name(ttype) + " " + prefix + tfunction->get_name()
+		+ "(IAsyncResult asyncResult)";
+}
+
+string t_csharp5_generator::function_signature_async(t_function* tfunction,
+	string prefix) {
+t_type* ttype = tfunction->get_returntype();
+string task = "Task";
+if (!ttype->is_void())
+	task += "<" + type_name(ttype) + ">";
+return task + " " + prefix + tfunction->get_name() + "Async("
+		+ argument_list(tfunction->get_arglist()) + ")";
+}
+
+string t_csharp5_generator::argument_list(t_struct* tstruct) {
+string result = "";
+const vector<t_field*>& fields = tstruct->get_members();
+vector<t_field*>::const_iterator f_iter;
+bool first = true;
+for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+	if (first) {
+		first = false;
+	} else {
+		result += ", ";
+	}
+	result += type_name((*f_iter)->get_type()) + " " + (*f_iter)->get_name();
+}
+return result;
+}
+
+string t_csharp5_generator::type_to_enum(t_type* type) {
+while (type->is_typedef()) {
+	type = ((t_typedef*) type)->get_type();
+}
+
+if (type->is_base_type()) {
+	t_base_type::t_base tbase = ((t_base_type*) type)->get_base();
+	switch (tbase) {
+	case t_base_type::TYPE_VOID:
+		throw "NO T_VOID CONSTRUCT";
+	case t_base_type::TYPE_STRING:
+		return "TType.String";
+	case t_base_type::TYPE_BOOL:
+		return "TType.Bool";
+	case t_base_type::TYPE_BYTE:
+		return "TType.Byte";
+	case t_base_type::TYPE_I16:
+		return "TType.I16";
+	case t_base_type::TYPE_I32:
+		return "TType.I32";
+	case t_base_type::TYPE_I64:
+		return "TType.I64";
+	case t_base_type::TYPE_DOUBLE:
+		return "TType.Double";
+	}
+} else if (type->is_enum()) {
+	return "TType.I32";
+} else if (type->is_struct() || type->is_xception()) {
+	return "TType.Struct";
+} else if (type->is_map()) {
+	return "TType.Map";
+} else if (type->is_set()) {
+	return "TType.Set";
+} else if (type->is_list()) {
+	return "TType.List";
+}
+
+throw "INVALID TYPE IN type_to_enum: " + type->get_name();
 }
 
 void t_csharp5_generator::generate_csharp_docstring_comment(ofstream &out,
-		string contents) {
-	generate_docstring_comment(out, "/// <summary>\n", "/// ", contents,
-			"/// </summary>\n");
+	string contents) {
+generate_docstring_comment(out, "/// <summary>\n", "/// ", contents,
+		"/// </summary>\n");
 
 }
 
 void t_csharp5_generator::generate_csharp_doc(ofstream &out, t_field* field) {
-	if (field->get_type()->is_enum()) {
-		string combined_message = field->get_doc() + "\n<seealso cref=\""
-				+ get_enum_class_name(field->get_type()) + "\"/>";
-		generate_csharp_docstring_comment(out, combined_message);
-	} else {
-		generate_csharp_doc(out, (t_doc*) field);
-	}
+if (field->get_type()->is_enum()) {
+	string combined_message = field->get_doc() + "\n<seealso cref=\""
+			+ get_enum_class_name(field->get_type()) + "\"/>";
+	generate_csharp_docstring_comment(out, combined_message);
+} else {
+	generate_csharp_doc(out, (t_doc*) field);
+}
 }
 
 void t_csharp5_generator::generate_csharp_doc(ofstream &out, t_doc* tdoc) {
-	if (tdoc->has_doc()) {
-		generate_csharp_docstring_comment(out, tdoc->get_doc());
-	}
+if (tdoc->has_doc()) {
+	generate_csharp_docstring_comment(out, tdoc->get_doc());
+}
 }
 
 void t_csharp5_generator::generate_csharp_doc(ofstream &out,
-		t_function* tfunction) {
-	if (tfunction->has_doc()) {
-		stringstream ps;
-		const vector<t_field*>& fields =
-				tfunction->get_arglist()->get_members();
-		vector<t_field*>::const_iterator p_iter;
-		for (p_iter = fields.begin(); p_iter != fields.end(); ++p_iter) {
-			t_field* p = *p_iter;
-			ps << "\n<param name=\"" << p->get_name() << "\">";
-			if (p->has_doc()) {
-				std::string str = p->get_doc();
-				str.erase(std::remove(str.begin(), str.end(), '\n'), str.end()); // remove the newlines that appear from the parser
-				ps << str;
-			}
-			ps << "</param>";
+	t_function* tfunction) {
+if (tfunction->has_doc()) {
+	stringstream ps;
+	const vector<t_field*>& fields = tfunction->get_arglist()->get_members();
+	vector<t_field*>::const_iterator p_iter;
+	for (p_iter = fields.begin(); p_iter != fields.end(); ++p_iter) {
+		t_field* p = *p_iter;
+		ps << "\n<param name=\"" << p->get_name() << "\">";
+		if (p->has_doc()) {
+			std::string str = p->get_doc();
+			str.erase(std::remove(str.begin(), str.end(), '\n'), str.end()); // remove the newlines that appear from the parser
+			ps << str;
 		}
-		generate_docstring_comment(out, "", "/// ",
-				"<summary>\n" + tfunction->get_doc() + "</summary>" + ps.str(),
-				"");
+		ps << "</param>";
 	}
+	generate_docstring_comment(out, "", "/// ",
+			"<summary>\n" + tfunction->get_doc() + "</summary>" + ps.str(), "");
+}
 }
 
 std::string t_csharp5_generator::get_enum_class_name(t_type* type) {
-	string package = "";
-	t_program* program = type->get_program();
-	if (program != NULL && program != program_) {
-		package = program->get_namespace("csharp") + ".";
-	}
-	return package + type->get_name();
+string package = "";
+t_program* program = type->get_program();
+if (program != NULL && program != program_) {
+	package = program->get_namespace("csharp") + ".";
+}
+return package + type->get_name();
 }
 
 THRIFT_REGISTER_GENERATOR(csharp5, "C# 5.0",
-"    wcf:             Adds bindings for WCF to generated classes.\n")
+	"    wcf:             Adds bindings for WCF to generated classes.\n")
 
