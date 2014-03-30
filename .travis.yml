@@ -26,7 +26,7 @@ rvm:
 # see what we need: http://thrift.apache.org/docs/install/ubuntu
 before_install:
  - export NUM_CPU="`grep processor /proc/cpuinfo | wc -l`"; echo $NUM_CPU
-# - sudo apt-get update -qq
+ - sudo apt-get update -qq
 # - sudo DEBIAN_FRONTEND=noninteractive apt-get -qq -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
  - sudo apt-get install -qq libboost-dev libboost-test-dev libboost-program-options-dev libevent-dev automake libtool flex bison pkg-config g++ libssl-dev 
 # Java
