@@ -38,6 +38,7 @@
 #include "t_list.h"
 #include "t_map.h"
 #include "t_set.h"
+#include "t_stream.h"
 #include "generate/t_generator_registry.h"
 //#include "t_doc.h"
 

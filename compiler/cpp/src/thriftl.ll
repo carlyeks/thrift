@@ -167,6 +167,7 @@ literal_begin (['\"])
 "map"                { return tok_map;                  }
 "list"               { return tok_list;                 }
 "set"                { return tok_set;                  }
+"stream"             { return tok_stream;               }
 "oneway"             { return tok_oneway;               }
 "typedef"            { return tok_typedef;              }
 "struct"             { return tok_struct;               }

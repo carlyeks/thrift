@@ -145,6 +145,7 @@ const int struct_is_union = 1;
 %token tok_map
 %token tok_list
 %token tok_set
+%token tok_stream
 
 /**
  * Function modifiers
@@ -178,6 +179,7 @@ const int struct_is_union = 1;
 %type<ttype>     MapType
 %type<ttype>     SetType
 %type<ttype>     ListType
+%type<ttype>     StreamType
 
 %type<tdoc>      Definition
 %type<ttype>     TypeDefinition
@@ -211,6 +213,8 @@ const int struct_is_union = 1;
 %type<tconstv>   ConstListContents
 %type<tconstv>   ConstMap
 %type<tconstv>   ConstMapContents
+%type<tconstv>   ConstStream
+%type<tconstv>   ConstStreamContents
 
 %type<iconst>    StructHead
 %type<tstruct>   Struct
@@ -723,6 +727,11 @@ ConstValue:
       pdebug("ConstValue => ConstMap");
       $$ = $1;
     }
+| ConstStream
+    {
+      pdebug("ConstValue => ConstStream");
+      $$ = $1;
+    }
 
 ConstList:
   '[' ConstListContents ']'
@@ -764,6 +773,28 @@ ConstMapContents:
       pdebug("ConstMapContents =>");
       $$ = new t_const_value();
       $$->set_map();
+    }
+
+
+ConstStream:
+  '[' ConstStreamContents ']'
+    {
+      pdebug("ConstStream => [ ConstStreamContents ]");
+      $$ = $2;
+    }
+
+ConstStreamContents:
+  ConstStreamContents ConstValue CommaOrSemicolonOptional
+    {
+      pdebug("ConstStreamContents => ConstStreamContents ConstValue CommaOrSemicolonOptional");
+      $$ = $1;
+      $$->add_stream($2);
+    }
+|
+    {
+      pdebug("ConstStreamContents =>");
+      $$ = new t_const_value();
+      $$->set_stream();
     }
 
 StructHead:
@@ -1206,6 +1237,11 @@ SimpleContainerType:
       pdebug("SimpleContainerType -> ListType");
       $$ = $1;
     }
+| StreamType
+    {
+      pdebug("SimpleContainerType -> StreamType");
+      $$ = $1;
+    }
 
 MapType:
   tok_map CppType '<' FieldType ',' FieldType '>'
@@ -1233,6 +1269,16 @@ ListType:
       pdebug("ListType -> tok_list<FieldType>");
       check_for_list_of_bytes($3);
       $$ = new t_list($3);
+      if ($5 != NULL) {
+        ((t_container*)$$)->set_cpp_name(std::string($5));
+      }
+    }
+
+StreamType:
+  tok_stream '<' FieldType '>' CppType
+    {
+      pdebug("StreamType -> tok_stream<FieldType>");
+      $$ = new t_stream($3);
       if ($5 != NULL) {
         ((t_container*)$$)->set_cpp_name(std::string($5));
       }

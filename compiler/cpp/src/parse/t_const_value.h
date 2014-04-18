@@ -40,6 +40,7 @@ class t_const_value {
     CV_STRING,
     CV_MAP,
     CV_LIST,
+    CV_STREAM,
     CV_IDENTIFIER
   };
 
@@ -119,6 +120,18 @@ class t_const_value {
   }
 
   const std::vector<t_const_value*>& get_list() const {
+    return listVal_;
+  }
+
+  void set_stream() {
+    valType_ = CV_STREAM;
+  }
+
+  void add_stream(t_const_value* val) {
+    listVal_.push_back(val);
+  }
+
+  const std::vector<t_const_value*>& get_stream() const {
     return listVal_;
   }
 
