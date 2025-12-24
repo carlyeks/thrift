@@ -115,6 +115,18 @@ public:
     return rv;
   }
 
+  uint32_t readStreamBegin(TType& elemType) {
+    uint32_t rv = source_->readStreamBegin(elemType);
+    sink_->writeStreamBegin(elemType);
+    return rv;
+  }
+
+  uint32_t readStreamEnd() {
+    uint32_t rv = source_->readStreamEnd();
+    sink_->writeStreamEnd();
+    return rv;
+  }
+
   uint32_t readBool(bool& value) {
     uint32_t rv = source_->readBool(value);
     sink_->writeBool(value);

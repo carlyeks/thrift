@@ -172,6 +172,12 @@ uint32_t TCompactProtocolT<Transport_>::writeSetBegin(const TType elemType,
   return writeCollectionBegin(elemType, size);
 }
 
+template <class Transport_>
+uint32_t TCompactProtocolT<Transport_>::writeStreamBegin(const TType elemType) {
+  // Write element type only (compact format, no size)
+  return writeByte(getCompactType(elemType));
+}
+
 /**
  * Write a map header. If the map is empty, omit the key and value type
  * headers, as we don't need any additional information to skip it.
@@ -601,6 +607,15 @@ template <class Transport_>
 uint32_t TCompactProtocolT<Transport_>::readSetBegin(TType& elemType,
                                                      uint32_t& size) {
   return readListBegin(elemType, size);
+}
+
+template <class Transport_>
+uint32_t TCompactProtocolT<Transport_>::readStreamBegin(TType& elemType) {
+  // Read element type only (compact format, no size)
+  int8_t type;
+  uint32_t result = readByte(type);
+  elemType = getTType(type);
+  return result;
 }
 
 /**

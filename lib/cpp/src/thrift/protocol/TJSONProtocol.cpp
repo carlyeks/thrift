@@ -682,6 +682,17 @@ uint32_t TJSONProtocol::writeSetEnd() {
   return writeJSONArrayEnd();
 }
 
+uint32_t TJSONProtocol::writeStreamBegin(const TType elemType) {
+  uint32_t result = 0;
+  result += writeJSONArrayStart();
+  result += writeJSONString(getTypeNameForTypeID(elemType));
+  return result;
+}
+
+uint32_t TJSONProtocol::writeStreamEnd() {
+  return writeJSONArrayEnd();
+}
+
 uint32_t TJSONProtocol::writeBool(const bool value) {
   return writeJSONInteger(value);
 }
@@ -1074,6 +1085,19 @@ uint32_t TJSONProtocol::readSetBegin(TType& elemType, uint32_t& size) {
 }
 
 uint32_t TJSONProtocol::readSetEnd() {
+  return readJSONArrayEnd();
+}
+
+uint32_t TJSONProtocol::readStreamBegin(TType& elemType) {
+  uint32_t result = 0;
+  result += readJSONArrayStart();
+  std::string elemTypeName;
+  result += readJSONString(elemTypeName);
+  elemType = getTypeIDForTypeName(elemTypeName);
+  return result;
+}
+
+uint32_t TJSONProtocol::readStreamEnd() {
   return readJSONArrayEnd();
 }
 

@@ -94,6 +94,10 @@ public:
 
   uint32_t writeSetEnd();
 
+  uint32_t writeStreamBegin(const TType elemType);
+
+  uint32_t writeStreamEnd();
+
   uint32_t writeBool(const bool value);
 
   uint32_t writeByte(const int8_t byte);

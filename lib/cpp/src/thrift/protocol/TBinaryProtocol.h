@@ -102,6 +102,10 @@ public:
 
   inline uint32_t writeSetEnd();
 
+  inline uint32_t writeStreamBegin(const TType elemType);
+
+  inline uint32_t writeStreamEnd();
+
   inline uint32_t writeBool(const bool value);
 
   inline uint32_t writeByte(const int8_t byte);
@@ -148,6 +152,10 @@ public:
   inline uint32_t readSetBegin(TType& elemType, uint32_t& size);
 
   inline uint32_t readSetEnd();
+
+  inline uint32_t readStreamBegin(TType& elemType);
+
+  inline uint32_t readStreamEnd();
 
   inline uint32_t readBool(bool& value);
   // Provide the default readBool() implementation for std::vector<bool>
