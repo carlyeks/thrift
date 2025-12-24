@@ -38,6 +38,7 @@
 #include "thrift/parse/t_list.h"
 #include "thrift/parse/t_map.h"
 #include "thrift/parse/t_set.h"
+#include "thrift/parse/t_stream.h"
 #include "thrift/generate/t_generator_registry.h"
 //#include "thrift/parse/t_doc.h"
 

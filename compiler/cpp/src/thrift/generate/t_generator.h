@@ -33,6 +33,7 @@
 #include "thrift/version.h"
 #include "thrift/generate/t_generator_registry.h"
 #include "thrift/parse/t_program.h"
+#include "thrift/parse/t_stream.h"
 
 /**
  * Base class for a thrift code generator. This class defines the basic
@@ -87,6 +88,44 @@ public:
   static bool is_valid_namespace(const std::string& sub_namespace) {
     (void)sub_namespace;
     return false;
+  }
+
+  /**
+   * Check if this generator supports stream types.
+   * By default, generators do not support streams and will treat them as lists.
+   * Override this method to return true in generators that have stream support.
+   */
+  virtual bool supports_streams() const {
+    return false;
+  }
+
+  /**
+   * Get the effective type for code generation, converting streams to lists
+   * if the generator does not support streams.
+   * This ensures backward compatibility for languages without stream support.
+   *
+   * Use this method when generating type declarations, field types, etc.
+   * This affects both the generated API surface and the wire protocol.
+   */
+  t_type* get_effective_type(t_type* type) const {
+    t_type* true_type = type->get_true_type();
+    if (!supports_streams() && true_type->is_stream()) {
+      return static_cast<t_stream*>(true_type)->as_list();
+    }
+    return type;
+  }
+
+  /**
+   * Check if a type should be treated as a stream for code generation purposes.
+   * Returns false if the generator doesn't support streams (even for stream types).
+   *
+   * Use this to decide whether to generate stream-specific code or list-based code.
+   */
+  bool is_effective_stream(t_type* type) const {
+    if (!supports_streams()) {
+      return false;
+    }
+    return type->get_true_type()->is_stream();
   }
 
   /**
