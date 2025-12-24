@@ -107,6 +107,11 @@ public:
   void close_generator() override;
   std::string display_name() const override;
 
+  /**
+   * Stream support - C++ generator supports streams
+   */
+  bool supports_streams() const override { return true; }
+
   void generate_consts(std::vector<t_const*> consts) override;
 
   /**
@@ -209,6 +214,8 @@ public:
                                          bool push_back,
                                          std::string index);
 
+  void generate_deserialize_stream_element(std::ostream& out, t_stream* tstream, std::string prefix);
+
   void generate_serialize_field(std::ostream& out,
                                 t_field* tfield,
                                 std::string prefix = "",
@@ -226,6 +233,8 @@ public:
   void generate_serialize_set_element(std::ostream& out, t_set* tmap, std::string iter);
 
   void generate_serialize_list_element(std::ostream& out, t_list* tlist, std::string iter);
+
+  void generate_serialize_stream_element(std::ostream& out, t_stream* tstream, std::string iter);
 
   void generate_function_call(ostream& out,
                               t_function* tfunction,
@@ -4144,7 +4153,12 @@ void t_cpp_generator::generate_deserialize_container(ostream& out, t_type* ttype
   t_container* tcontainer = (t_container*)ttype;
   bool use_push = tcontainer->has_cpp_name();
 
-  indent(out) << prefix << ".clear();" << '\n' << indent() << "uint32_t " << size << ";" << '\n';
+  indent(out) << prefix << ".clear();" << '\n';
+
+  // Streams don't have a size variable
+  if (!ttype->is_stream()) {
+    indent(out) << "uint32_t " << size << ";" << '\n';
+  }
 
   // Declare variables, read header
   if (ttype->is_map()) {
@@ -4160,24 +4174,50 @@ void t_cpp_generator::generate_deserialize_container(ostream& out, t_type* ttype
     if (!use_push) {
       indent(out) << prefix << ".resize(" << size << ");" << '\n';
     }
+  } else if (ttype->is_stream()) {
+    out << indent() << "::apache::thrift::protocol::TType " << etype << ";" << '\n' << indent()
+        << "xfer += iprot->readStreamBegin(" << etype << ");" << '\n';
   }
 
-  // For loop iterates over elements
-  string i = tmp("_i");
-  out << indent() << "uint32_t " << i << ";" << '\n' << indent() << "for (" << i << " = 0; " << i
-      << " < " << size << "; ++" << i << ")" << '\n';
+  // Streams use while loop with has_more, others use for loop with size
+  if (ttype->is_stream()) {
+    string has_more = tmp("_has_more");
+    out << indent() << "int8_t " << has_more << ";" << '\n'
+        << indent() << "while (true)" << '\n';
+    scope_up(out);
+    indent(out) << "xfer += iprot->readByte(" << has_more << ");" << '\n';
+    indent(out) << "if (" << has_more << " == ::apache::thrift::protocol::T_STREAM_END) {" << '\n';
+    indent_up();
+    indent(out) << "break;" << '\n';
+    indent_down();
+    indent(out) << "}" << '\n';
+    indent(out) << "if (" << has_more << " != ::apache::thrift::protocol::T_STREAM_NEXT) {" << '\n';
+    indent_up();
+    indent(out) << "throw ::apache::thrift::protocol::TProtocolException("
+                << "::apache::thrift::protocol::TProtocolException::INVALID_DATA, "
+                << "\"Invalid stream continuation byte\");" << '\n';
+    indent_down();
+    indent(out) << "}" << '\n';
+    generate_deserialize_stream_element(out, (t_stream*)ttype, prefix);
+    scope_down(out);
+  } else {
+    // For loop iterates over elements
+    string i = tmp("_i");
+    out << indent() << "uint32_t " << i << ";" << '\n' << indent() << "for (" << i << " = 0; " << i
+        << " < " << size << "; ++" << i << ")" << '\n';
 
-  scope_up(out);
+    scope_up(out);
 
-  if (ttype->is_map()) {
-    generate_deserialize_map_element(out, (t_map*)ttype, prefix);
-  } else if (ttype->is_set()) {
-    generate_deserialize_set_element(out, (t_set*)ttype, prefix);
-  } else if (ttype->is_list()) {
-    generate_deserialize_list_element(out, (t_list*)ttype, prefix, use_push, i);
+    if (ttype->is_map()) {
+      generate_deserialize_map_element(out, (t_map*)ttype, prefix);
+    } else if (ttype->is_set()) {
+      generate_deserialize_set_element(out, (t_set*)ttype, prefix);
+    } else if (ttype->is_list()) {
+      generate_deserialize_list_element(out, (t_list*)ttype, prefix, use_push, i);
+    }
+
+    scope_down(out);
   }
-
-  scope_down(out);
 
   // Read container end
   if (ttype->is_map()) {
@@ -4186,6 +4226,8 @@ void t_cpp_generator::generate_deserialize_container(ostream& out, t_type* ttype
     indent(out) << "xfer += iprot->readSetEnd();" << '\n';
   } else if (ttype->is_list()) {
     indent(out) << "xfer += iprot->readListEnd();" << '\n';
+  } else if (ttype->is_stream()) {
+    indent(out) << "xfer += iprot->readStreamEnd();" << '\n';
   }
 
   scope_down(out);
@@ -4235,6 +4277,17 @@ void t_cpp_generator::generate_deserialize_list_element(ostream& out,
     t_field felem(tlist->get_elem_type(), prefix + "[" + index + "]");
     generate_deserialize_field(out, &felem);
   }
+}
+
+/**
+ * Deserializes the elements of a stream.
+ */
+void t_cpp_generator::generate_deserialize_stream_element(ostream& out, t_stream* tstream, string prefix) {
+  string elem = tmp("_elem");
+  t_field felem(tstream->get_elem_type(), elem);
+  indent(out) << declare_field(&felem) << '\n';
+  generate_deserialize_field(out, &felem);
+  indent(out) << prefix << ".push_back(" << elem << ");" << '\n';
 }
 
 /**
@@ -4351,6 +4404,9 @@ void t_cpp_generator::generate_serialize_container(ostream& out, t_type* ttype, 
     indent(out) << "xfer += oprot->writeListBegin("
                 << type_to_enum(((t_list*)ttype)->get_elem_type()) << ", "
                 << "static_cast<uint32_t>(" << prefix << ".size()));" << '\n';
+  } else if (ttype->is_stream()) {
+    indent(out) << "xfer += oprot->writeStreamBegin("
+                << type_to_enum(((t_stream*)ttype)->get_elem_type()) << ");" << '\n';
   }
 
   string iter = tmp("_iter");
@@ -4358,14 +4414,25 @@ void t_cpp_generator::generate_serialize_container(ostream& out, t_type* ttype, 
       << "for (" << iter << " = " << prefix << ".begin(); " << iter << " != " << prefix
       << ".end(); ++" << iter << ")" << '\n';
   scope_up(out);
+  if (ttype->is_stream()) {
+    // Write has_more byte before each element
+    indent(out) << "xfer += oprot->writeByte(::apache::thrift::protocol::T_STREAM_NEXT);" << '\n';
+  }
   if (ttype->is_map()) {
     generate_serialize_map_element(out, (t_map*)ttype, iter);
   } else if (ttype->is_set()) {
     generate_serialize_set_element(out, (t_set*)ttype, iter);
   } else if (ttype->is_list()) {
     generate_serialize_list_element(out, (t_list*)ttype, iter);
+  } else if (ttype->is_stream()) {
+    generate_serialize_stream_element(out, (t_stream*)ttype, iter);
   }
   scope_down(out);
+
+  if (ttype->is_stream()) {
+    // Write end-of-stream marker
+    indent(out) << "xfer += oprot->writeByte(::apache::thrift::protocol::T_STREAM_END);" << '\n';
+  }
 
   if (ttype->is_map()) {
     indent(out) << "xfer += oprot->writeMapEnd();" << '\n';
@@ -4373,6 +4440,8 @@ void t_cpp_generator::generate_serialize_container(ostream& out, t_type* ttype, 
     indent(out) << "xfer += oprot->writeSetEnd();" << '\n';
   } else if (ttype->is_list()) {
     indent(out) << "xfer += oprot->writeListEnd();" << '\n';
+  } else if (ttype->is_stream()) {
+    indent(out) << "xfer += oprot->writeStreamEnd();" << '\n';
   }
 
   scope_down(out);
@@ -4403,6 +4472,14 @@ void t_cpp_generator::generate_serialize_set_element(ostream& out, t_set* tset, 
  */
 void t_cpp_generator::generate_serialize_list_element(ostream& out, t_list* tlist, string iter) {
   t_field efield(tlist->get_elem_type(), "(*" + iter + ")");
+  generate_serialize_field(out, &efield, "");
+}
+
+/**
+ * Serializes the elements of a stream.
+ */
+void t_cpp_generator::generate_serialize_stream_element(ostream& out, t_stream* tstream, string iter) {
+  t_field efield(tstream->get_elem_type(), "(*" + iter + ")");
   generate_serialize_field(out, &efield, "");
 }
 
@@ -4525,6 +4602,11 @@ string t_cpp_generator::type_name(t_type* ttype, bool in_typedef, bool arg) {
     } else if (ttype->is_list()) {
       t_list* tlist = (t_list*)ttype;
       cname = "std::vector<" + type_name(tlist->get_elem_type(), in_typedef) + "> ";
+    } else if (ttype->is_stream()) {
+      t_stream* tstream = (t_stream*)ttype;
+      // Streams use std::vector as underlying container type
+      // TODO: Could use custom TStream<T> wrapper for true streaming semantics
+      cname = "std::vector<" + type_name(tstream->get_elem_type(), in_typedef) + "> ";
     }
 
     if (arg) {
