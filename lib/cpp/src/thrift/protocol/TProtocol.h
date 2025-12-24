@@ -260,6 +260,10 @@ public:
 
   virtual uint32_t writeSetEnd_virt() = 0;
 
+  virtual uint32_t writeStreamBegin_virt(const TType elemType) = 0;
+
+  virtual uint32_t writeStreamEnd_virt() = 0;
+
   virtual uint32_t writeBool_virt(const bool value) = 0;
 
   virtual uint32_t writeByte_virt(const int8_t byte) = 0;
@@ -345,6 +349,16 @@ public:
     return writeSetEnd_virt();
   }
 
+  uint32_t writeStreamBegin(const TType elemType) {
+    T_VIRTUAL_CALL();
+    return writeStreamBegin_virt(elemType);
+  }
+
+  uint32_t writeStreamEnd() {
+    T_VIRTUAL_CALL();
+    return writeStreamEnd_virt();
+  }
+
   uint32_t writeBool(const bool value) {
     T_VIRTUAL_CALL();
     return writeBool_virt(value);
@@ -419,6 +433,10 @@ public:
   virtual uint32_t readSetBegin_virt(TType& elemType, uint32_t& size) = 0;
 
   virtual uint32_t readSetEnd_virt() = 0;
+
+  virtual uint32_t readStreamBegin_virt(TType& elemType) = 0;
+
+  virtual uint32_t readStreamEnd_virt() = 0;
 
   virtual uint32_t readBool_virt(bool& value) = 0;
 
@@ -498,6 +516,16 @@ public:
   uint32_t readSetEnd() {
     T_VIRTUAL_CALL();
     return readSetEnd_virt();
+  }
+
+  uint32_t readStreamBegin(TType& elemType) {
+    T_VIRTUAL_CALL();
+    return readStreamBegin_virt(elemType);
+  }
+
+  uint32_t readStreamEnd() {
+    T_VIRTUAL_CALL();
+    return readStreamEnd_virt();
   }
 
   uint32_t readBool(bool& value) {
@@ -782,6 +810,39 @@ uint32_t skip(Protocol_& prot, TType type) {
       result += skip(prot, elemType);
     }
     result += prot.readListEnd();
+    return result;
+  }
+  case T_STREAM: {
+    uint32_t result = 0;
+    TType elemType;
+    result += prot.readStreamBegin(elemType);
+    while (true) {
+      int8_t has_more;
+      result += prot.readByte(has_more);
+      if (has_more == T_STREAM_END) {
+        break;
+      }
+      if (has_more == T_STREAM_ERROR) {
+        // Skip exception data - read as struct
+        std::string name;
+        int16_t fid;
+        TType ftype;
+        result += prot.readStructBegin(name);
+        while (true) {
+          result += prot.readFieldBegin(name, ftype, fid);
+          if (ftype == T_STOP) {
+            break;
+          }
+          result += skip(prot, ftype);
+          result += prot.readFieldEnd();
+        }
+        result += prot.readStructEnd();
+        break;
+      }
+      // T_STREAM_NEXT - skip the element
+      result += skip(prot, elemType);
+    }
+    result += prot.readStreamEnd();
     return result;
   }
   default:

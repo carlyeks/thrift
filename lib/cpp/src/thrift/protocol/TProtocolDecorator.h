@@ -83,6 +83,11 @@ public:
   }
   uint32_t writeSetEnd_virt() override { return protocol->writeSetEnd(); }
 
+  uint32_t writeStreamBegin_virt(const TType elemType) override {
+    return protocol->writeStreamBegin(elemType);
+  }
+  uint32_t writeStreamEnd_virt() override { return protocol->writeStreamEnd(); }
+
   uint32_t writeBool_virt(const bool value) override { return protocol->writeBool(value); }
   uint32_t writeByte_virt(const int8_t byte) override { return protocol->writeByte(byte); }
   uint32_t writeI16_virt(const int16_t i16) override { return protocol->writeI16(i16); }
@@ -125,6 +130,11 @@ public:
     return protocol->readSetBegin(elemType, size);
   }
   uint32_t readSetEnd_virt() override { return protocol->readSetEnd(); }
+
+  uint32_t readStreamBegin_virt(TType& elemType) override {
+    return protocol->readStreamBegin(elemType);
+  }
+  uint32_t readStreamEnd_virt() override { return protocol->readStreamEnd(); }
 
   uint32_t readBool_virt(bool& value) override { return protocol->readBool(value); }
   uint32_t readBool_virt(std::vector<bool>::reference value) override {

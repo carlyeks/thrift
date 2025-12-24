@@ -47,6 +47,7 @@ enum TType {
   T_SET        = 14,
   T_LIST       = 15,
   T_UUID       = 16,
+  T_STREAM     = 17,
 };
 
 /**
@@ -58,6 +59,19 @@ enum TMessageType {
   T_REPLY      = 2,
   T_EXCEPTION  = 3,
   T_ONEWAY     = 4
+};
+
+/**
+ * Enumerated definition of the stream message types for streaming support.
+ * These map to the has_more byte values in the streaming list encoding:
+ * - 0 (END): Stream finished successfully, no more elements
+ * - 1 (NEXT): Stream element follows
+ * - 2 (ERROR): Stream error/exception follows, stream closed
+ */
+enum TStreamMessageType {
+  T_STREAM_END   = 0,  // Stream finished successfully, stream closed
+  T_STREAM_NEXT  = 1,  // Stream element follows
+  T_STREAM_ERROR = 2   // Stream error/exception follows, stream closed
 };
 
 }}} // apache::thrift::protocol
