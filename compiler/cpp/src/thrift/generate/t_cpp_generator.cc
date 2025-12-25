@@ -4860,6 +4860,8 @@ string t_cpp_generator::type_to_enum(t_type* type) {
     return "::apache::thrift::protocol::T_SET";
   } else if (type->is_list()) {
     return "::apache::thrift::protocol::T_LIST";
+  } else if (type->is_stream()) {
+    return "::apache::thrift::protocol::T_STREAM";
   }
 
   throw "INVALID TYPE IN type_to_enum: " + type->get_name();
