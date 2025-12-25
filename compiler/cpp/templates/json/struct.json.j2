@@ -1,0 +1,23 @@
+{
+  "name": "{{ name }}",
+{% if doc %}
+  "doc": "{{ doc }}",
+{% endif %}
+  "isException": {{ is_xception | lower }},
+  "isUnion": {{ is_union | lower }},
+  "fields": [
+{% for field in fields %}
+    {
+      "key": {{ field.key }},
+      "name": "{{ field.name }}",
+      "type": "{{ field.type.type }}",
+      "required": {{ field.required | lower }},
+      "optional": {{ field.optional | lower }}{% if field.doc %},
+      "doc": "{{ field.doc }}"{% endif %}{% if field.default_value %},
+      "defaultValue": {{ field.default_value }}{% endif %}
+
+    }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ]
+}

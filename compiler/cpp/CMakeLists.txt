@@ -46,6 +46,7 @@ add_library(parse STATIC ${parse_SOURCES})
 set(compiler_core
     src/thrift/common.cc
     src/thrift/generate/t_generator.cc
+    src/thrift/generate/t_template_generator.cc
     src/thrift/generate/validator_parser.cc
     src/thrift/generate/validator_parser.h
     src/thrift/parse/t_typedef.cc
@@ -102,6 +103,7 @@ THRIFT_ADD_COMPILER(java          "Enable compiler for Java"   ON)
 THRIFT_ADD_COMPILER(javame        "Enable compiler for Java ME" ON)
 THRIFT_ADD_COMPILER(js            "Enable compiler for JavaScript" ON)
 THRIFT_ADD_COMPILER(json          "Enable compiler for JSON" ON)
+THRIFT_ADD_COMPILER(json_template "Enable template-based compiler for JSON (PoC)" ON)
 THRIFT_ADD_COMPILER(kotlin        "Enable compiler for Kotlin" ON)
 THRIFT_ADD_COMPILER(lua           "Enable compiler for Lua" ON)
 THRIFT_ADD_COMPILER(netstd        "Enable compiler for .NET Standard" ON)
@@ -121,7 +123,8 @@ THRIFT_ADD_VALIDATOR_COMPILER(go           "Enable validator compiler for Go" ON
 
 # Thrift is looking for include files in the src directory
 # we also add the current binary directory for generated files
-include_directories(${CMAKE_CURRENT_BINARY_DIR} src)
+# and third_party for template engine (inja/nlohmann-json)
+include_directories(${CMAKE_CURRENT_BINARY_DIR} src third_party)
 
 list(APPEND thrift-compiler_SOURCES ${compiler_core})
 
