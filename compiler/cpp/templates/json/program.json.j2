@@ -1,0 +1,113 @@
+{
+  "name": "{{ program_name }}",
+{% if not merge_includes %}
+  "namespaces": {
+{% for ns in namespaces %}
+    "{{ ns.key }}": "{{ ns.value }}"{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  },
+  "includes": [
+{% for inc in includes %}
+    "{{ inc }}"{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ],
+{% endif %}
+  "enums": [
+{% for enum in enums %}
+    {
+      "name": "{{ enum.name }}",
+      "members": [
+{% for value in enum.values %}
+        {
+          "name": "{{ value.name }}",
+          "value": {{ value.value }}
+        }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+      ]
+    }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ],
+  "typedefs": [
+{% for typedef in typedefs %}
+    {
+      "name": "{{ typedef.name }}",
+      "type": "{{ typedef.type.type }}"
+    }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ],
+  "structs": [
+{% for struct in structs %}
+    {
+      "name": "{{ struct.name }}",
+      "isException": {{ struct.is_xception }},
+      "isUnion": {{ struct.is_union }},
+      "fields": [
+{% for field in struct.fields %}
+        {
+          "key": {{ field.key }},
+          "name": "{{ field.name }}",
+          "typeId": "{{ field.type.type }}",
+          "required": "{% if field.required %}required{% else %}{% if field.optional %}optional{% else %}req_out{% endif %}{% endif %}"
+        }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+      ]
+    }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ],
+  "constants": [
+{% for constant in constants %}
+    {
+      "name": "{{ constant.name }}",
+      "type": "{{ constant.type.type }}",
+      "value": {{ constant.value }}
+    }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ],
+  "services": [
+{% for service in services %}
+    {
+      "name": "{{ service.name }}",
+      "functions": [
+{% for func in service.functions %}
+        {
+          "name": "{{ func.name }}",
+          "returnTypeId": "{{ func.return_type.type }}",
+          "oneway": {{ func.oneway }},
+          "arguments": [
+{% for arg in func.args %}
+            {
+              "key": {{ arg.key }},
+              "name": "{{ arg.name }}",
+              "typeId": "{{ arg.type.type }}",
+              "required": "req_out"
+            }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+          ],
+          "exceptions": [
+{% for exc in func.exceptions %}
+            {
+              "key": {{ exc.key }},
+              "name": "{{ exc.name }}",
+              "typeId": "{{ exc.type.type }}"
+            }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+          ]
+        }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+      ]
+    }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ]
+}

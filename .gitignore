@@ -73,6 +73,7 @@ project.lock.json
 /compiler/cpp/test/thrift-gen-*
 /compiler/cpp/src/thrift/thrift-bootstrap
 /compiler/cpp/src/thrift/plugin/gen.stamp
+/compiler/cpp/build/
 /compiler/cpp/Debug
 /compiler/cpp/Release
 /compiler/cpp/compiler/Debug

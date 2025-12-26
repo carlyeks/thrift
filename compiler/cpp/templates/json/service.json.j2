@@ -1,0 +1,42 @@
+{
+  "name": "{{ name }}",
+{% if doc %}
+  "doc": "{{ doc }}",
+{% endif %}
+{% if extends %}
+  "extends": "{{ extends }}",
+{% endif %}
+  "functions": [
+{% for func in functions %}
+    {
+      "name": "{{ func.name }}",
+      "oneway": {{ func.oneway | lower }},
+      "returnType": "{{ func.return_type.type }}",
+{% if func.doc %}
+      "doc": "{{ func.doc }}",
+{% endif %}
+      "arguments": [
+{% for arg in func.args %}
+        {
+          "key": {{ arg.key }},
+          "name": "{{ arg.name }}",
+          "type": "{{ arg.type.type }}"
+        }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+      ],
+      "exceptions": [
+{% for exc in func.exceptions %}
+        {
+          "key": {{ exc.key }},
+          "name": "{{ exc.name }}",
+          "type": "{{ exc.type.type }}"
+        }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+      ]
+    }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ]
+}

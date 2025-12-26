@@ -1,0 +1,17 @@
+{
+  "name": "{{ name }}",
+{% if doc %}
+  "doc": "{{ doc }}",
+{% endif %}
+  "members": [
+{% for value in values %}
+    {
+      "name": "{{ value.name }}",
+      "value": {{ value.value }}{% if value.doc %},
+      "doc": "{{ value.doc }}"{% endif %}
+
+    }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+  ]
+}
