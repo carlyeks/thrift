@@ -91,6 +91,12 @@ class TProtocolBase(object):
     def writeListEnd(self):
         pass
 
+    def writeStreamBegin(self, etype):
+        pass
+
+    def writeStreamEnd(self):
+        pass
+
     def writeSetBegin(self, etype, size):
         pass
 
@@ -149,6 +155,12 @@ class TProtocolBase(object):
         pass
 
     def readListEnd(self):
+        pass
+
+    def readStreamBegin(self):
+        pass
+
+    def readStreamEnd(self):
         pass
 
     def readSetBegin(self):
@@ -221,6 +233,14 @@ class TProtocolBase(object):
             for i in range(size):
                 self.skip(etype)
             self.readListEnd()
+        elif ttype == TType.STREAM:
+            etype = self.readStreamBegin()
+            while True:
+                has_more = self.readByte()
+                if has_more == 0:  # T_STREAM_END
+                    break
+                self.skip(etype)
+            self.readStreamEnd()
         else:
             raise TProtocolException(
                 TProtocolException.INVALID_DATA,
@@ -244,8 +264,8 @@ class TProtocolBase(object):
         ('readContainerMap', 'writeContainerMap', True),  # 13 TType.MAP
         ('readContainerSet', 'writeContainerSet', True),  # 14 TType.SET
         ('readContainerList', 'writeContainerList', True),  # 15 TType.LIST
-        (None, None, False),  # 16 TType.UTF8 # TODO: handle utf8 types?
-        (None, None, False)  # 17 TType.UTF16 # TODO: handle utf16 types?
+        (None, None, False),  # 16 TType.UUID
+        ('readContainerStream', 'writeContainerStream', True)  # 17 TType.STREAM
     )
 
     def _ttype_handlers(self, ttype, spec):
@@ -311,6 +331,23 @@ class TProtocolBase(object):
         self.readMapEnd()
         return results
 
+    def readContainerStream(self, spec):
+        ttype, tspec, is_immutable = spec
+        etype = self.readStreamBegin()
+        # TODO: compare types we just decoded with thrift_spec
+        results = []
+        while True:
+            has_more = self.readByte()
+            if has_more == 0:  # T_STREAM_END
+                break
+            if has_more != 1:  # T_STREAM_NEXT
+                raise TProtocolException(TProtocolException.INVALID_DATA,
+                                       'Invalid stream continuation byte: %d' % has_more)
+            elem = next(self._read_by_ttype(ttype, spec, tspec))
+            results.append(elem)
+        self.readStreamEnd()
+        return tuple(results) if is_immutable else results
+
     def readStruct(self, obj, thrift_spec, is_immutable=False):
         if is_immutable:
             fields = {}
@@ -363,6 +400,15 @@ class TProtocolBase(object):
                      self._write_by_ttype(vtype, val.values(), spec, vspec)):
             pass
         self.writeMapEnd()
+
+    def writeContainerStream(self, val, spec):
+        ttype, tspec, _ = spec
+        self.writeStreamBegin(ttype)
+        for elem in val:
+            self.writeByte(1)  # T_STREAM_NEXT
+            next(self._write_by_ttype(ttype, [elem], spec, tspec))
+        self.writeByte(0)  # T_STREAM_END
+        self.writeStreamEnd()
 
     def writeStruct(self, obj, thrift_spec):
         self.writeStructBegin(obj.__class__.__name__)

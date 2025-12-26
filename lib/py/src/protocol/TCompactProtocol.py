@@ -94,6 +94,8 @@ class CompactType(object):
     SET = 0x0A
     MAP = 0x0B
     STRUCT = 0x0C
+    UUID = 0x0D
+    STREAM = 0x0E
 
 
 CTYPES = {
@@ -109,6 +111,8 @@ CTYPES = {
     TType.LIST: CompactType.LIST,
     TType.SET: CompactType.SET,
     TType.MAP: CompactType.MAP,
+    TType.UUID: CompactType.UUID,
+    TType.STREAM: CompactType.STREAM,
 }
 
 TTYPES = {}
@@ -245,6 +249,16 @@ class TCompactProtocol(TProtocolBase):
     writeMapEnd = writeCollectionEnd
     writeSetEnd = writeCollectionEnd
     writeListEnd = writeCollectionEnd
+
+    def writeStreamBegin(self, etype):
+        assert self.state in (VALUE_WRITE, CONTAINER_WRITE), self.state
+        self.__writeUByte(CTYPES[etype])
+        self.__containers.append(self.state)
+        self.state = CONTAINER_WRITE
+
+    def writeStreamEnd(self):
+        assert self.state == CONTAINER_WRITE, self.state
+        self.state = self.__containers.pop()
 
     def writeBool(self, bool):
         if self.state == BOOL_WRITE:
@@ -394,6 +408,18 @@ class TCompactProtocol(TProtocolBase):
     readSetEnd = readCollectionEnd
     readListEnd = readCollectionEnd
     readMapEnd = readCollectionEnd
+
+    def readStreamBegin(self):
+        assert self.state in (VALUE_READ, CONTAINER_READ), self.state
+        etype_byte = self.__readUByte()
+        etype = self.__getTType(etype_byte)
+        self.__containers.append(self.state)
+        self.state = CONTAINER_READ
+        return etype
+
+    def readStreamEnd(self):
+        assert self.state == CONTAINER_READ, self.state
+        self.state = self.__containers.pop()
 
     def readBool(self):
         if self.state == BOOL_READ:
