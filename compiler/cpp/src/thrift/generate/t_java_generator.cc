@@ -149,6 +149,8 @@ public:
   void close_generator() override;
   std::string display_name() const override;
 
+  bool supports_streams() const override { return true; }
+
   void generate_consts(std::vector<t_const*> consts) override;
 
   /**
@@ -321,6 +323,16 @@ public:
                                        t_list* tlist,
                                        std::string iter,
                                        bool has_metadata = true);
+
+  void generate_serialize_stream_element(std::ostream& out,
+                                         t_stream* tstream,
+                                         std::string iter,
+                                         bool has_metadata = true);
+
+  void generate_deserialize_stream_element(std::ostream& out,
+                                           t_stream* tstream,
+                                           std::string prefix = "",
+                                           bool has_metadata = true);
 
   void generate_deep_copy_container(std::ostream& out,
                                     std::string source_name_p1,
@@ -2947,6 +2959,8 @@ std::string t_java_generator::get_java_type_string(t_type* type) {
     return "org.apache.thrift.protocol.TType.MAP";
   } else if (type->is_set()) {
     return "org.apache.thrift.protocol.TType.SET";
+  } else if (type->is_stream()) {
+    return "org.apache.thrift.protocol.TType.STREAM";
   } else if (type->is_struct() || type->is_xception()) {
     return "org.apache.thrift.protocol.TType.STRUCT";
   } else if (type->is_enum()) {
@@ -3052,6 +3066,11 @@ void t_java_generator::generate_field_value_meta_data(std::ostream& out, t_type*
       indent(out)
           << "new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, ";
       t_type* elem_type = ((t_set*)ttype)->get_elem_type();
+      generate_field_value_meta_data(out, elem_type);
+    } else if (ttype->is_stream()) {
+      indent(out)
+          << "new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.STREAM, ";
+      t_type* elem_type = ((t_stream*)ttype)->get_elem_type();
       generate_field_value_meta_data(out, elem_type);
     } else { // map
       indent(out)
@@ -4228,6 +4247,8 @@ void t_java_generator::generate_deserialize_container(ostream& out,
     obj = tmp("_set");
   } else if (ttype->is_list()) {
     obj = tmp("_list");
+  } else if (ttype->is_stream()) {
+    obj = tmp("_stream");
   }
 
   if (has_metadata) {
@@ -4241,6 +4262,8 @@ void t_java_generator::generate_deserialize_container(ostream& out,
     } else if (ttype->is_list()) {
       indent(out) << "org.apache.thrift.protocol.TList " << obj << " = iprot.readListBegin();"
                   << '\n';
+    } else if (ttype->is_stream()) {
+      indent(out) << "byte " << obj << " = iprot.readStreamBegin();" << '\n';
     }
   } else {
     // Declare variables, read header
@@ -4254,6 +4277,9 @@ void t_java_generator::generate_deserialize_container(ostream& out,
     } else if (ttype->is_list()) {
       indent(out) << "org.apache.thrift.protocol.TList " << obj << " = iprot.readListBegin("
                   << type_to_enum(((t_list*)ttype)->get_elem_type()) << ");" << '\n';
+    } else if (ttype->is_stream()) {
+      indent(out) << "byte " << obj << " = iprot.readStreamBegin("
+                  << type_to_enum(((t_stream*)ttype)->get_elem_type()) << ");" << '\n';
     }
   }
 
@@ -4274,6 +4300,9 @@ void t_java_generator::generate_deserialize_container(ostream& out,
   } else if (sorted_containers_ && (ttype->is_map() || ttype->is_set())) {
     // TreeSet and TreeMap don't have any constructor which takes a capacity as an argument
     out << "();" << '\n';
+  } else if (ttype->is_stream()) {
+    // Streams don't have a size up front, initialize empty
+    out << "();" << '\n';
   } else {
     out << "(" << (ttype->is_list() ? "" : "2*") << obj << ".size"
         << ");" << '\n';
@@ -4290,6 +4319,8 @@ void t_java_generator::generate_deserialize_container(ostream& out,
     generate_deserialize_set_element(out, (t_set*)ttype, prefix, obj, has_metadata);
   } else if (ttype->is_list()) {
     generate_deserialize_list_element(out, (t_list*)ttype, prefix, obj, has_metadata);
+  } else if (ttype->is_stream()) {
+    generate_deserialize_stream_element(out, (t_stream*)ttype, prefix, has_metadata);
   }
 
   scope_down(out);
@@ -4302,6 +4333,8 @@ void t_java_generator::generate_deserialize_container(ostream& out,
       indent(out) << "iprot.readSetEnd();" << '\n';
     } else if (ttype->is_list()) {
       indent(out) << "iprot.readListEnd();" << '\n';
+    } else if (ttype->is_stream()) {
+      indent(out) << "iprot.readStreamEnd();" << '\n';
     }
   }
   scope_down(out);
@@ -4541,6 +4574,9 @@ void t_java_generator::generate_serialize_container(ostream& out,
       indent(out) << "oprot.writeListBegin(new org.apache.thrift.protocol.TList("
                   << type_to_enum(((t_list*)ttype)->get_elem_type()) << ", " << prefix
                   << ".size()));" << '\n';
+    } else if (ttype->is_stream()) {
+      indent(out) << "oprot.writeStreamBegin(" << type_to_enum(((t_stream*)ttype)->get_elem_type())
+                  << ");" << '\n';
     }
   } else {
     indent(out) << "oprot.writeI32(" << prefix << ".size());" << '\n';
@@ -4558,6 +4594,9 @@ void t_java_generator::generate_serialize_container(ostream& out,
   } else if (ttype->is_list()) {
     indent(out) << "for (" << type_name(((t_list*)ttype)->get_elem_type()) << " " << iter << " : "
                 << prefix << ")";
+  } else if (ttype->is_stream()) {
+    indent(out) << "for (" << type_name(((t_stream*)ttype)->get_elem_type()) << " " << iter << " : "
+                << prefix << ")";
   }
 
   out << '\n';
@@ -4568,8 +4607,15 @@ void t_java_generator::generate_serialize_container(ostream& out,
     generate_serialize_set_element(out, (t_set*)ttype, iter, has_metadata);
   } else if (ttype->is_list()) {
     generate_serialize_list_element(out, (t_list*)ttype, iter, has_metadata);
+  } else if (ttype->is_stream()) {
+    generate_serialize_stream_element(out, (t_stream*)ttype, iter, has_metadata);
   }
   scope_down(out);
+
+  // Write stream end marker after the loop
+  if (ttype->is_stream()) {
+    indent(out) << "oprot.writeByte((byte)0); // T_STREAM_END" << '\n';
+  }
 
   if (has_metadata) {
     if (ttype->is_map()) {
@@ -4578,6 +4624,8 @@ void t_java_generator::generate_serialize_container(ostream& out,
       indent(out) << "oprot.writeSetEnd();" << '\n';
     } else if (ttype->is_list()) {
       indent(out) << "oprot.writeListEnd();" << '\n';
+    } else if (ttype->is_stream()) {
+      indent(out) << "oprot.writeStreamEnd();" << '\n';
     }
   }
 
@@ -4619,6 +4667,66 @@ void t_java_generator::generate_serialize_list_element(ostream& out,
                                                        bool has_metadata) {
   t_field efield(tlist->get_elem_type(), iter);
   generate_serialize_field(out, &efield, "", "", has_metadata);
+}
+
+/**
+ * Serializes the elements of a stream.
+ */
+void t_java_generator::generate_serialize_stream_element(ostream& out,
+                                                         t_stream* tstream,
+                                                         string iter,
+                                                         bool has_metadata) {
+  indent(out) << "oprot.writeByte((byte)1); // T_STREAM_NEXT" << '\n';
+  t_field efield(tstream->get_elem_type(), iter);
+  generate_serialize_field(out, &efield, "", "", has_metadata);
+}
+
+/**
+ * Deserializes the elements of a stream.
+ */
+void t_java_generator::generate_deserialize_stream_element(ostream& out,
+                                                           t_stream* tstream,
+                                                           string prefix,
+                                                           bool has_metadata) {
+  string elem = tmp("_elem");
+  t_field felem(tstream->get_elem_type(), elem);
+
+  indent(out) << "while (true)" << '\n';
+  scope_up(out);
+
+  string has_more = tmp("_has_more");
+  indent(out) << "byte " << has_more << " = iprot.readByte();" << '\n';
+  indent(out) << "if (" << has_more << " == (byte)0) { // T_STREAM_END" << '\n';
+  indent_up();
+  indent(out) << "break;" << '\n';
+  indent_down();
+  indent(out) << "}" << '\n';
+  indent(out) << "if (" << has_more << " != (byte)1) { // T_STREAM_NEXT" << '\n';
+  indent_up();
+  indent(out) << "throw new org.apache.thrift.protocol.TProtocolException("
+              << "org.apache.thrift.protocol.TProtocolException.INVALID_DATA, "
+              << "\"Invalid stream continuation byte: \" + " << has_more << ");" << '\n';
+  indent_down();
+  indent(out) << "}" << '\n';
+
+  generate_deserialize_field(out, &felem, "", has_metadata);
+
+  if (get_true_type(felem.get_type())->is_enum()) {
+    indent(out) << "if (" << elem << " != null)" << '\n';
+    scope_up(out);
+  }
+
+  indent(out) << prefix << ".add(" << elem << ");" << '\n';
+
+  if (get_true_type(felem.get_type())->is_enum()) {
+    scope_down(out);
+  }
+
+  if (reuse_objects_ && !get_true_type(felem.get_type())->is_base_type()) {
+    indent(out) << elem << " = null;" << '\n';
+  }
+
+  scope_down(out);
 }
 
 /**
@@ -4678,6 +4786,14 @@ string t_java_generator::type_name(t_type* ttype,
       prefix = "java.util.List";
     }
     return prefix + (skip_generic ? "" : "<" + type_name(tlist->get_elem_type(), true) + ">");
+  } else if (ttype->is_stream()) {
+    t_stream* tstream = (t_stream*)ttype;
+    if (in_init) {
+      prefix = "java.util.ArrayList";
+    } else {
+      prefix = "java.util.List";
+    }
+    return prefix + (skip_generic ? "" : "<" + type_name(tstream->get_elem_type(), true) + ">");
   }
 
   // Check for namespacing
@@ -4962,6 +5078,8 @@ string t_java_generator::type_to_enum(t_type* type) {
     return "org.apache.thrift.protocol.TType.SET";
   } else if (type->is_list()) {
     return "org.apache.thrift.protocol.TType.LIST";
+  } else if (type->is_stream()) {
+    return "org.apache.thrift.protocol.TType.STREAM";
   }
 
   throw "INVALID TYPE IN type_to_enum: " + type->get_name();
