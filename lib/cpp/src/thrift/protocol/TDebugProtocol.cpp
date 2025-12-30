@@ -304,6 +304,15 @@ uint32_t TDebugProtocol::writeSetEnd() {
   return size;
 }
 
+uint32_t TDebugProtocol::writeStreamBegin(const TType elemType) {
+  // Write element type only (no size for streams)
+  return writeByte((int8_t)elemType);
+}
+
+uint32_t TDebugProtocol::writeStreamEnd() {
+  return 0;
+}
+
 uint32_t TDebugProtocol::writeBool(const bool value) {
   return writeItem(value ? "true" : "false");
 }

@@ -114,6 +114,14 @@ uint32_t THeaderProtocol::writeSetEnd() {
   return proto_->writeSetEnd();
 }
 
+uint32_t THeaderProtocol::writeStreamBegin(const TType elemType) {
+  return proto_->writeStreamBegin(elemType);
+}
+
+uint32_t THeaderProtocol::writeStreamEnd() {
+  return proto_->writeStreamEnd();
+}
+
 uint32_t THeaderProtocol::writeBool(const bool value) {
   return proto_->writeBool(value);
 }
@@ -217,6 +225,14 @@ uint32_t THeaderProtocol::readSetBegin(TType& elemType, uint32_t& size) {
 
 uint32_t THeaderProtocol::readSetEnd() {
   return proto_->readSetEnd();
+}
+
+uint32_t THeaderProtocol::readStreamBegin(TType& elemType) {
+  return proto_->readStreamBegin(elemType);
+}
+
+uint32_t THeaderProtocol::readStreamEnd() {
+  return proto_->readStreamEnd();
 }
 
 uint32_t THeaderProtocol::readBool(bool& value) {

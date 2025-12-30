@@ -101,6 +101,12 @@ class TBinaryProtocol(TProtocolBase):
     def writeSetEnd(self):
         pass
 
+    def writeStreamBegin(self, etype):
+        self.writeByte(etype)
+
+    def writeStreamEnd(self):
+        pass
+
     def writeBool(self, bool):
         if bool:
             self.writeByte(1)
@@ -196,6 +202,13 @@ class TBinaryProtocol(TProtocolBase):
         return (etype, size)
 
     def readSetEnd(self):
+        pass
+
+    def readStreamBegin(self):
+        etype = self.readByte()
+        return etype
+
+    def readStreamEnd(self):
         pass
 
     def readBool(self):

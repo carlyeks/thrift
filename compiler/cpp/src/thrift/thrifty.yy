@@ -149,6 +149,7 @@ const int struct_is_union = 1;
 %token<keyword> tok_map
 %token<keyword> tok_list
 %token<keyword> tok_set
+%token<keyword> tok_stream
 
 /**
  * Function modifiers
@@ -183,6 +184,7 @@ const int struct_is_union = 1;
 %type<ttype>     MapType
 %type<ttype>     SetType
 %type<ttype>     ListType
+%type<ttype>     StreamType
 
 %type<tdoc>      Definition
 %type<ttype>     TypeDefinition
@@ -948,6 +950,11 @@ FieldName:  // identifiers and everything that could be one if it would not be i
       pdebug("FieldName -> tok_set");
       $$ = strdup("set");
     }
+| tok_stream
+    {
+      pdebug("FieldName -> tok_stream");
+      $$ = strdup("stream");
+    }
 | tok_oneway
     {
       pdebug("FieldName -> tok_oneway");
@@ -1243,6 +1250,11 @@ SimpleContainerType:
       pdebug("SimpleContainerType -> ListType");
       $$ = $1;
     }
+| StreamType
+    {
+      pdebug("SimpleContainerType -> StreamType");
+      $$ = $1;
+    }
 
 MapType:
   tok_map CppType '<' FieldType ',' FieldType '>'
@@ -1280,6 +1292,13 @@ ListType:
       if (($2 != nullptr) && ($6 != nullptr)) {
         pwarning(1, "Two cpp_types clauses at list<%>\n", $2);
       }
+    }
+
+StreamType:
+  tok_stream '<' FieldType '>'
+    {
+      pdebug("StreamType -> tok_stream<FieldType>");
+      $$ = new t_stream($3);
     }
 
 CppType:

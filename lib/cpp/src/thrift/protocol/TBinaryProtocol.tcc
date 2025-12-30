@@ -131,6 +131,17 @@ uint32_t TBinaryProtocolT<Transport_, ByteOrder_>::writeSetEnd() {
 }
 
 template <class Transport_, class ByteOrder_>
+uint32_t TBinaryProtocolT<Transport_, ByteOrder_>::writeStreamBegin(const TType elemType) {
+  // Write element type only (no size for streams)
+  return writeByte((int8_t)elemType);
+}
+
+template <class Transport_, class ByteOrder_>
+uint32_t TBinaryProtocolT<Transport_, ByteOrder_>::writeStreamEnd() {
+  return 0;
+}
+
+template <class Transport_, class ByteOrder_>
 uint32_t TBinaryProtocolT<Transport_, ByteOrder_>::writeBool(const bool value) {
   uint8_t tmp = value ? 1 : 0;
   this->trans_->write(&tmp, 1);
@@ -354,6 +365,20 @@ uint32_t TBinaryProtocolT<Transport_, ByteOrder_>::readSetBegin(TType& elemType,
 
 template <class Transport_, class ByteOrder_>
 uint32_t TBinaryProtocolT<Transport_, ByteOrder_>::readSetEnd() {
+  return 0;
+}
+
+template <class Transport_, class ByteOrder_>
+uint32_t TBinaryProtocolT<Transport_, ByteOrder_>::readStreamBegin(TType& elemType) {
+  // Read element type only (no size for streams)
+  int8_t type;
+  uint32_t result = readByte(type);
+  elemType = (TType)type;
+  return result;
+}
+
+template <class Transport_, class ByteOrder_>
+uint32_t TBinaryProtocolT<Transport_, ByteOrder_>::readStreamEnd() {
   return 0;
 }
 

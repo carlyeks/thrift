@@ -35,7 +35,9 @@ class TType(object):
     SET = 14
     LIST = 15
     UTF8 = 16
+    UUID = 16
     UTF16 = 17
+    STREAM = 17
 
     _VALUES_TO_NAMES = (
         'STOP',
@@ -54,8 +56,8 @@ class TType(object):
         'MAP',
         'SET',
         'LIST',
-        'UTF8',
-        'UTF16',
+        'UUID',
+        'STREAM',
     )
 
 

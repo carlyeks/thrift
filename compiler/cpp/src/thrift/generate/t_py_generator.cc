@@ -164,6 +164,11 @@ public:
   std::string display_name() const override;
 
   /**
+   * Stream support - Python generator supports streams
+   */
+  bool supports_streams() const override { return true; }
+
+  /**
    * Program-level generation functions
    */
 
@@ -222,6 +227,10 @@ public:
                                          t_list* tlist,
                                          std::string prefix = "");
 
+  void generate_deserialize_stream_element(std::ostream& out,
+                                           t_stream* tstream,
+                                           std::string prefix = "");
+
   void generate_serialize_field(std::ostream& out, t_field* tfield, std::string prefix = "");
 
   void generate_serialize_struct(std::ostream& out, t_struct* tstruct, std::string prefix = "");
@@ -236,6 +245,8 @@ public:
   void generate_serialize_set_element(std::ostream& out, t_set* tmap, std::string iter);
 
   void generate_serialize_list_element(std::ostream& out, t_list* tlist, std::string iter);
+
+  void generate_serialize_stream_element(std::ostream& out, t_stream* tstream, std::string iter);
 
   void generate_python_docstring(std::ostream& out, t_struct* tstruct);
 
@@ -2430,24 +2441,44 @@ void t_py_generator::generate_deserialize_container(ostream& out, t_type* ttype,
   } else if (ttype->is_list()) {
     out << indent() << prefix << " = []" << '\n' << indent() << "(" << etype << ", " << size
         << ") = iprot.readListBegin()" << '\n';
+  } else if (ttype->is_stream()) {
+    out << indent() << prefix << " = []" << '\n' << indent() << etype << " = iprot.readStreamBegin()" << '\n';
   }
 
-  // For loop iterates over elements
-  string i = tmp("_i");
-  indent(out) <<
-    "for " << i << " in range(" << size << "):" << '\n';
+  // Streams use while loop with has_more, others use for loop with size
+  if (ttype->is_stream()) {
+    string has_more = tmp("_has_more");
+    indent(out) << "while True:" << '\n';
+    indent_up();
+    indent(out) << has_more << " = iprot.readByte()" << '\n';
+    indent(out) << "if " << has_more << " == 0:  # T_STREAM_END" << '\n';
+    indent_up();
+    indent(out) << "break" << '\n';
+    indent_down();
+    indent(out) << "if " << has_more << " != 1:  # T_STREAM_NEXT" << '\n';
+    indent_up();
+    indent(out) << "raise TProtocolException(TProtocolException.INVALID_DATA, 'Invalid stream continuation byte')" << '\n';
+    indent_down();
+    generate_deserialize_stream_element(out, (t_stream*)ttype, prefix);
+    indent_down();
+  } else {
+    // For loop iterates over elements
+    string i = tmp("_i");
+    indent(out) <<
+      "for " << i << " in range(" << size << "):" << '\n';
 
-  indent_up();
+    indent_up();
 
-  if (ttype->is_map()) {
-    generate_deserialize_map_element(out, (t_map*)ttype, prefix);
-  } else if (ttype->is_set()) {
-    generate_deserialize_set_element(out, (t_set*)ttype, prefix);
-  } else if (ttype->is_list()) {
-    generate_deserialize_list_element(out, (t_list*)ttype, prefix);
+    if (ttype->is_map()) {
+      generate_deserialize_map_element(out, (t_map*)ttype, prefix);
+    } else if (ttype->is_set()) {
+      generate_deserialize_set_element(out, (t_set*)ttype, prefix);
+    } else if (ttype->is_list()) {
+      generate_deserialize_list_element(out, (t_list*)ttype, prefix);
+    }
+
+    indent_down();
   }
-
-  indent_down();
 
   // Read container end
   if (ttype->is_map()) {
@@ -2465,6 +2496,8 @@ void t_py_generator::generate_deserialize_container(ostream& out, t_type* ttype,
       indent(out) << prefix << " = tuple(" << prefix << ")" << '\n';
     }
     indent(out) << "iprot.readListEnd()" << '\n';
+  } else if (ttype->is_stream()) {
+    indent(out) << "iprot.readStreamEnd()" << '\n';
   }
 }
 
@@ -2503,6 +2536,20 @@ void t_py_generator::generate_deserialize_list_element(ostream& out,
                                                        string prefix) {
   string elem = tmp("_elem");
   t_field felem(tlist->get_elem_type(), elem);
+
+  generate_deserialize_field(out, &felem);
+
+  indent(out) << prefix << ".append(" << elem << ")" << '\n';
+}
+
+/**
+ * Deserializes the elements of a stream.
+ */
+void t_py_generator::generate_deserialize_stream_element(ostream& out,
+                                                          t_stream* tstream,
+                                                          string prefix) {
+  string elem = tmp("_elem");
+  t_field felem(tstream->get_elem_type(), elem);
 
   generate_deserialize_field(out, &felem);
 
@@ -2611,6 +2658,9 @@ void t_py_generator::generate_serialize_container(ostream& out, t_type* ttype, s
     indent(out) << "oprot.writeListBegin(" << type_to_enum(((t_list*)ttype)->get_elem_type())
                 << ", "
                 << "len(" << prefix << "))" << '\n';
+  } else if (ttype->is_stream()) {
+    indent(out) << "oprot.writeStreamBegin(" << type_to_enum(((t_stream*)ttype)->get_elem_type())
+                << ")" << '\n';
   }
 
   if (ttype->is_map()) {
@@ -2632,6 +2682,16 @@ void t_py_generator::generate_serialize_container(ostream& out, t_type* ttype, s
     indent_up();
     generate_serialize_list_element(out, (t_list*)ttype, iter);
     indent_down();
+  } else if (ttype->is_stream()) {
+    string iter = tmp("iter");
+    indent(out) << "for " << iter << " in " << prefix << ":" << '\n';
+    indent_up();
+    // Write has_more byte before each element
+    indent(out) << "oprot.writeByte(1)  # T_STREAM_NEXT" << '\n';
+    generate_serialize_stream_element(out, (t_stream*)ttype, iter);
+    indent_down();
+    // Write end-of-stream marker
+    indent(out) << "oprot.writeByte(0)  # T_STREAM_END" << '\n';
   }
 
   if (ttype->is_map()) {
@@ -2640,6 +2700,8 @@ void t_py_generator::generate_serialize_container(ostream& out, t_type* ttype, s
     indent(out) << "oprot.writeSetEnd()" << '\n';
   } else if (ttype->is_list()) {
     indent(out) << "oprot.writeListEnd()" << '\n';
+  } else if (ttype->is_stream()) {
+    indent(out) << "oprot.writeStreamEnd()" << '\n';
   }
 }
 
@@ -2671,6 +2733,14 @@ void t_py_generator::generate_serialize_set_element(ostream& out, t_set* tset, s
  */
 void t_py_generator::generate_serialize_list_element(ostream& out, t_list* tlist, string iter) {
   t_field efield(tlist->get_elem_type(), iter);
+  generate_serialize_field(out, &efield, "");
+}
+
+/**
+ * Serializes the elements of a stream.
+ */
+void t_py_generator::generate_serialize_stream_element(ostream& out, t_stream* tstream, string iter) {
+  t_field efield(tstream->get_elem_type(), iter);
   generate_serialize_field(out, &efield, "");
 }
 
@@ -2913,6 +2983,8 @@ string t_py_generator::type_to_py_type(t_type* type) {
     return "set[" + type_to_py_type(((t_set*)type)->get_elem_type()) + "]";
   } else if (type->is_list()) {
     return "list[" + type_to_py_type(((t_list*)type)->get_elem_type()) + "]";
+  } else if (type->is_stream()) {
+    return "list[" + type_to_py_type(((t_stream*)type)->get_elem_type()) + "]";
   }
 
   throw "INVALID TYPE IN type_to_py_type: " + type->get_name();
@@ -2958,6 +3030,8 @@ string t_py_generator::type_to_enum(t_type* type) {
     return "TType.SET";
   } else if (type->is_list()) {
     return "TType.LIST";
+  } else if (type->is_stream()) {
+    return "TType.STREAM";
   }
 
   throw "INVALID TYPE IN type_to_enum: " + type->get_name();
@@ -2994,6 +3068,10 @@ string t_py_generator::type_to_spec_args(t_type* ttype) {
     return "(" + type_to_enum(((t_list*)ttype)->get_elem_type()) + ", "
            + type_to_spec_args(((t_list*)ttype)->get_elem_type()) + ", "
            + (is_immutable(ttype) ? "True" : "False") + ")";
+  } else if (ttype->is_stream()) {
+    return "(" + type_to_enum(((t_stream*)ttype)->get_elem_type()) + ", "
+           + type_to_spec_args(((t_stream*)ttype)->get_elem_type()) + ", "
+           + "False)";  // Streams are never immutable
   }
 
   throw "INVALID TYPE IN type_to_spec_args: " + ttype->get_name();

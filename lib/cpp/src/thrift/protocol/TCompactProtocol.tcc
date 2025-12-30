@@ -62,10 +62,11 @@ enum Types {
   CT_SET            = 0x0A,
   CT_MAP            = 0x0B,
   CT_STRUCT         = 0x0C,
-  CT_UUID           = 0x0D
+  CT_UUID           = 0x0D,
+  CT_STREAM         = 0x0E
 };
 
-const int8_t TTypeToCType[17] = {
+const int8_t TTypeToCType[18] = {
   CT_STOP, // T_STOP
   0, // unused
   CT_BOOLEAN_TRUE, // T_BOOL
@@ -83,6 +84,7 @@ const int8_t TTypeToCType[17] = {
   CT_SET, // T_SET
   CT_LIST, // T_LIST
   CT_UUID, // T_UUID
+  CT_STREAM, // T_STREAM
 };
 
 }} // end detail::compact namespace
@@ -170,6 +172,12 @@ template <class Transport_>
 uint32_t TCompactProtocolT<Transport_>::writeSetBegin(const TType elemType,
                                                       const uint32_t size) {
   return writeCollectionBegin(elemType, size);
+}
+
+template <class Transport_>
+uint32_t TCompactProtocolT<Transport_>::writeStreamBegin(const TType elemType) {
+  // Write element type only (compact format, no size)
+  return writeByte(getCompactType(elemType));
 }
 
 /**
@@ -603,6 +611,15 @@ uint32_t TCompactProtocolT<Transport_>::readSetBegin(TType& elemType,
   return readListBegin(elemType, size);
 }
 
+template <class Transport_>
+uint32_t TCompactProtocolT<Transport_>::readStreamBegin(TType& elemType) {
+  // Read element type only (compact format, no size)
+  int8_t type;
+  uint32_t result = readByte(type);
+  elemType = getTType(type);
+  return result;
+}
+
 /**
  * Read a boolean off the wire. If this is a boolean field, the value should
  * already have been read during readFieldBegin, so we'll just consume the
@@ -848,6 +865,8 @@ TType TCompactProtocolT<Transport_>::getTType(int8_t type) {
       return T_STRUCT;
     case detail::compact::CT_UUID:
       return T_UUID;
+    case detail::compact::CT_STREAM:
+      return T_STREAM;
     default:
       throw TException(std::string("don't know what type: ") + static_cast<char>(type));
   }

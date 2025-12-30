@@ -77,6 +77,7 @@ CTYPES = {
     TType.LIST: 'lst',
     TType.SET: 'set',
     TType.MAP: 'map',
+    TType.STREAM: 'stm',
 }
 
 JTYPES = {}
@@ -462,6 +463,14 @@ class TJSONProtocol(TJSONProtocolBase):
     readSetEnd = readCollectionEnd
     readListEnd = readCollectionEnd
 
+    def readStreamBegin(self):
+        self.readJSONArrayStart()
+        elemType = JTYPES[self.readJSONString(False)]
+        return elemType
+
+    def readStreamEnd(self):
+        self.readJSONArrayEnd()
+
     def readBool(self):
         return (False if self.readJSONInteger() == 0 else True)
 
@@ -534,6 +543,13 @@ class TJSONProtocol(TJSONProtocolBase):
         self.writeJSONNumber(size)
 
     def writeSetEnd(self):
+        self.writeJSONArrayEnd()
+
+    def writeStreamBegin(self, etype):
+        self.writeJSONArrayStart()
+        self.writeJSONString(CTYPES[etype])
+
+    def writeStreamEnd(self):
         self.writeJSONArrayEnd()
 
     def writeBool(self, boolean):

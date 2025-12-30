@@ -115,6 +115,18 @@ public:
                              "this protocol does not support reading (yet).");
   }
 
+  // Stream methods - transform to list protocol (fallback for protocols without native stream support)
+  uint32_t readStreamBegin(TType& elemType) {
+    // Read as T_STREAM type (element type only, no size)
+    // Note: This is just the stream begin marker, caller must handle has_more framing
+    (void)elemType;
+    return 0;  // No bytes read - just a marker
+  }
+
+  uint32_t readStreamEnd() {
+    return 0;  // No bytes read - just a marker
+  }
+
   uint32_t readBool(bool& value) {
     (void)value;
     throw TProtocolException(TProtocolException::NOT_IMPLEMENTED,
@@ -250,6 +262,18 @@ public:
                              "this protocol does not support writing (yet).");
   }
 
+  // Stream methods - transform to list protocol (fallback for protocols without native stream support)
+  uint32_t writeStreamBegin(const TType elemType) {
+    // Write as T_STREAM type (element type only, no size)
+    // Note: This is just the stream begin marker, caller must handle has_more framing
+    (void)elemType;
+    return 0;  // No bytes written - just a marker
+  }
+
+  uint32_t writeStreamEnd() {
+    return 0;  // No bytes written - just a marker
+  }
+
   uint32_t writeBool(const bool value) {
     (void)value;
     throw TProtocolException(TProtocolException::NOT_IMPLEMENTED,
@@ -361,6 +385,12 @@ public:
 
   uint32_t writeSetEnd_virt() override { return static_cast<Protocol_*>(this)->writeSetEnd(); }
 
+  uint32_t writeStreamBegin_virt(const TType elemType) override {
+    return static_cast<Protocol_*>(this)->writeStreamBegin(elemType);
+  }
+
+  uint32_t writeStreamEnd_virt() override { return static_cast<Protocol_*>(this)->writeStreamEnd(); }
+
   uint32_t writeBool_virt(const bool value) override {
     return static_cast<Protocol_*>(this)->writeBool(value);
   }
@@ -438,6 +468,12 @@ public:
   }
 
   uint32_t readSetEnd_virt() override { return static_cast<Protocol_*>(this)->readSetEnd(); }
+
+  uint32_t readStreamBegin_virt(TType& elemType) override {
+    return static_cast<Protocol_*>(this)->readStreamBegin(elemType);
+  }
+
+  uint32_t readStreamEnd_virt() override { return static_cast<Protocol_*>(this)->readStreamEnd(); }
 
   uint32_t readBool_virt(bool& value) override {
     return static_cast<Protocol_*>(this)->readBool(value);

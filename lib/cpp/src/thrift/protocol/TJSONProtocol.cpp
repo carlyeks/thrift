@@ -69,6 +69,7 @@ static const std::string kTypeNameMap("map");
 static const std::string kTypeNameList("lst");
 static const std::string kTypeNameSet("set");
 static const std::string kTypeNameUuid("uid");
+static const std::string kTypeNameStream("stm");
 
 static const std::string& getTypeNameForTypeID(TType typeID) {
   switch (typeID) {
@@ -96,6 +97,8 @@ static const std::string& getTypeNameForTypeID(TType typeID) {
     return kTypeNameList;
   case T_UUID:
     return kTypeNameUuid;
+  case T_STREAM:
+    return kTypeNameStream;
   default:
     throw TProtocolException(TProtocolException::NOT_IMPLEMENTED, "Unrecognized type");
   }
@@ -135,7 +138,11 @@ static TType getTypeIDForTypeName(const std::string& name) {
       break;
     case 's':
       if (name[1] == 't') {
-        result = T_STRING;
+        if (name.length() > 2 && name[2] == 'm') {
+          result = T_STREAM;
+        } else {
+          result = T_STRING;
+        }
       } else if (name[1] == 'e') {
         result = T_SET;
       }
@@ -682,6 +689,17 @@ uint32_t TJSONProtocol::writeSetEnd() {
   return writeJSONArrayEnd();
 }
 
+uint32_t TJSONProtocol::writeStreamBegin(const TType elemType) {
+  uint32_t result = 0;
+  result += writeJSONArrayStart();
+  result += writeJSONString(getTypeNameForTypeID(elemType));
+  return result;
+}
+
+uint32_t TJSONProtocol::writeStreamEnd() {
+  return writeJSONArrayEnd();
+}
+
 uint32_t TJSONProtocol::writeBool(const bool value) {
   return writeJSONInteger(value);
 }
@@ -1074,6 +1092,19 @@ uint32_t TJSONProtocol::readSetBegin(TType& elemType, uint32_t& size) {
 }
 
 uint32_t TJSONProtocol::readSetEnd() {
+  return readJSONArrayEnd();
+}
+
+uint32_t TJSONProtocol::readStreamBegin(TType& elemType) {
+  uint32_t result = 0;
+  result += readJSONArrayStart();
+  std::string elemTypeName;
+  result += readJSONString(elemTypeName);
+  elemType = getTypeIDForTypeName(elemTypeName);
+  return result;
+}
+
+uint32_t TJSONProtocol::readStreamEnd() {
   return readJSONArrayEnd();
 }
 

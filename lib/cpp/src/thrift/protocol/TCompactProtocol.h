@@ -168,6 +168,8 @@ public:
   uint32_t writeMapEnd() { return 0; }
   uint32_t writeListEnd() { return 0; }
   uint32_t writeSetEnd() { return 0; }
+  uint32_t writeStreamBegin(const TType elemType);
+  uint32_t writeStreamEnd() { return 0; }
   uint32_t writeFieldEnd() { return 0; }
 
 protected:
@@ -226,6 +228,8 @@ public:
   uint32_t readMapEnd() { return 0; }
   uint32_t readListEnd() { return 0; }
   uint32_t readSetEnd() { return 0; }
+  uint32_t readStreamBegin(TType& elemType);
+  uint32_t readStreamEnd() { return 0; }
 
 protected:
   uint32_t readVarint32(int32_t& i32);

@@ -33,6 +33,7 @@
 #include "thrift/parse/t_map.h"
 #include "thrift/parse/t_list.h"
 #include "thrift/parse/t_set.h"
+#include "thrift/parse/t_stream.h"
 
 /**
  * This represents a variable scope used for looking up predefined types and
